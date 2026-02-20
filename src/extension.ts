@@ -366,7 +366,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   // ── Webview HTML ──────────────────────────────────────────────────
 
   private _getHtmlContent(): string {
-    const isActive = this._pollingStatus === 'active';
     const hasError = this._pollingStatus === 'error';
 
     return `<!DOCTYPE html>
@@ -399,27 +398,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           font-weight: 600;
           color: var(--vscode-foreground);
           font-family: var(--vscode-font-family);
-        }
-        .status-indicator {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-left: 4px;
-          font-size: 11px;
-          font-family: var(--vscode-font-family);
-          color: var(--vscode-descriptionForeground);
-        }
-        .status-dot {
-          width: 8px; height: 8px;
-          border-radius: 50%;
-          background: #888;
-        }
-        .status-dot.active { background: #10b981; animation: pulse 2s infinite; }
-        .status-dot.error { background: #f14c4c; }
-        .status-dot.stopped { background: #888; }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
         }
         .spacer { flex: 1; }
         .btn {
@@ -818,10 +796,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
     <body>
       <div class="header">
         <h2>QAPilot</h2>
-        <div class="status-indicator">
-          <span class="status-dot ${isActive ? 'active' : hasError ? 'error' : 'stopped'}" id="status-dot"></span>
-          <span id="status-text">${isActive ? 'Polling' : hasError ? 'Error' : 'Stopped'}</span>
-        </div>
         <span class="spacer"></span>
         <button class="btn" id="clear-btn" onclick="clearLogs()">Clear</button>
       </div>
@@ -1298,24 +1272,13 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
         function updatePollingStatus(status, error) {
           pollingStatus = status;
-          const dot = document.getElementById('status-dot');
-          const text = document.getElementById('status-text');
           const errorBanner = document.getElementById('error-banner');
           const errorMessage = document.getElementById('error-message');
 
-          dot.className = 'status-dot';
-          if (status === 'active' || status === 'starting') {
-            dot.classList.add('active');
-            text.textContent = 'Polling';
-            errorBanner.classList.add('hidden');
-          } else if (status === 'error') {
-            dot.classList.add('error');
-            text.textContent = 'Error';
+          if (status === 'error') {
             errorMessage.textContent = error || 'Unknown error';
             errorBanner.classList.remove('hidden');
           } else {
-            dot.classList.add('stopped');
-            text.textContent = 'Stopped';
             errorBanner.classList.add('hidden');
           }
         }
