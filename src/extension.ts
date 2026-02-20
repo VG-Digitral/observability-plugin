@@ -823,7 +823,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           <span id="status-text">${isActive ? 'Polling' : hasError ? 'Error' : 'Stopped'}</span>
         </div>
         <span class="spacer"></span>
-        <button class="btn" id="toggle-btn" onclick="togglePolling()">${isActive ? 'Pause' : 'Start'}</button>
         <button class="btn" id="clear-btn" onclick="clearLogs()">Clear</button>
       </div>
 
@@ -892,14 +891,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
         function startPolling() {
           vscode.postMessage({ type: 'startPolling' });
-        }
-
-        function togglePolling() {
-          if (pollingStatus === 'active' || pollingStatus === 'starting') {
-            vscode.postMessage({ type: 'stopPolling' });
-          } else {
-            vscode.postMessage({ type: 'startPolling' });
-          }
         }
 
         function clearLogs() {
@@ -1309,7 +1300,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           pollingStatus = status;
           const dot = document.getElementById('status-dot');
           const text = document.getElementById('status-text');
-          const toggleBtn = document.getElementById('toggle-btn');
           const errorBanner = document.getElementById('error-banner');
           const errorMessage = document.getElementById('error-message');
 
@@ -1317,18 +1307,15 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           if (status === 'active' || status === 'starting') {
             dot.classList.add('active');
             text.textContent = 'Polling';
-            toggleBtn.textContent = 'Pause';
             errorBanner.classList.add('hidden');
           } else if (status === 'error') {
             dot.classList.add('error');
             text.textContent = 'Error';
-            toggleBtn.textContent = 'Start';
             errorMessage.textContent = error || 'Unknown error';
             errorBanner.classList.remove('hidden');
           } else {
             dot.classList.add('stopped');
-            text.textContent = 'Paused';
-            toggleBtn.textContent = 'Start';
+            text.textContent = 'Stopped';
             errorBanner.classList.add('hidden');
           }
         }
