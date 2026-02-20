@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as http from 'http';
 import * as https from 'https';
 
 const API_URL = 'https://us6krurah3.execute-api.eu-north-1.amazonaws.com/prod/api/posthog';
@@ -21,6 +22,12 @@ interface LogEntry {
   personId: string;
   properties: Record<string, unknown>;
   receivedAt?: number;
+  isInsight?: boolean;
+  insightCategory?: string;
+  insightColor?: string;
+  insightType?: 'universal' | 'sub';
+  level2Markdown?: string;
+  sourceLogIds?: string[];
 }
 
 type PollingStatus = 'stopped' | 'starting' | 'active' | 'error';
@@ -35,6 +42,13 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _lastTimestamp: string | null = null;
   private _seenUuids: Set<string> = new Set();
   private _isFetching = false;
+  private _insightInterval: ReturnType<typeof setInterval> | null = null;
+  private _lastInsightTime: number = 0;
+  private readonly INSIGHT_INTERVAL_MS = 30000;
+  private _lastSummary: string = '';
+  private _consecutiveEmptyCycles: number = 0;
+  private readonly MAX_EMPTY_CYCLES = 2;
+  private _knownInsightCategories: Set<string> = new Set();
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -92,6 +106,8 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
     this._pollingStatus = 'active';
     this._updateWebviewStatus();
     log('Polling started (every 3 seconds)');
+
+    this._startInsightGeneration();
   }
 
   public stopPolling() {
@@ -99,9 +115,162 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
       clearInterval(this._pollTimer);
       this._pollTimer = null;
     }
+    this._stopInsightGeneration();
     this._pollingStatus = 'stopped';
     this._updateWebviewStatus();
     log('Polling stopped');
+  }
+
+  // ── Insight Generation ───────────────────────────────────────────
+
+  private _startInsightGeneration(): void {
+    this._stopInsightGeneration();
+    this._lastInsightTime = Date.now();
+    this._insightInterval = setInterval(async () => {
+      await this._generateInsights();
+    }, this.INSIGHT_INTERVAL_MS);
+    log('Started insight generation (every 30 seconds)');
+  }
+
+  private _stopInsightGeneration(): void {
+    if (this._insightInterval) {
+      clearInterval(this._insightInterval);
+      this._insightInterval = null;
+      log('Stopped insight generation');
+    }
+  }
+
+  private async _generateInsights(): Promise<void> {
+    const now = Date.now();
+    const cutoffTime = now - this.INSIGHT_INTERVAL_MS;
+
+    const recentLogs = this._logs.filter(l =>
+      l.receivedAt && l.receivedAt >= cutoffTime && !l.isInsight
+    );
+
+    if (recentLogs.length === 0) {
+      this._consecutiveEmptyCycles++;
+      log(`No new logs in the last 30s (empty cycle ${this._consecutiveEmptyCycles}/${this.MAX_EMPTY_CYCLES})`);
+      if (this._consecutiveEmptyCycles >= this.MAX_EMPTY_CYCLES) {
+        log('Circuit breaker: stopping insight generation');
+        this._stopInsightGeneration();
+        this._lastSummary = '';
+      }
+      return;
+    }
+
+    this._consecutiveEmptyCycles = 0;
+    log(`Generating insights for ${recentLogs.length} logs...`);
+
+    const logsText = recentLogs.map(l =>
+      `${l.timestamp} - ${l.logTag} - ${l.logLevel} - ${l.logMessage}`
+    ).join('\n');
+
+    const sourceLogIds = recentLogs.map(l => l.uuid);
+
+    try {
+      const body = JSON.stringify({
+        logs_text: logsText,
+        previous_summary: this._lastSummary
+      });
+
+      const result = await new Promise<string>((resolve, reject) => {
+        const req = http.request(
+          {
+            hostname: '3.228.128.128',
+            port: 80,
+            path: '/agent/analyze',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+            timeout: 30000
+          },
+          (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => resolve(data));
+          }
+        );
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
+        req.write(body);
+        req.end();
+      });
+
+      interface AnalyzeInsight {
+        category: string;
+        icon_color: string;
+        icon_url: string;
+        insight_type: 'universal' | 'sub';
+        level1: string;
+        level2_markdown: string;
+      }
+      interface AnalyzeResponse {
+        insights: AnalyzeInsight[];
+        neutral_summary: string;
+      }
+
+      const response: AnalyzeResponse = JSON.parse(result);
+
+      if (response.neutral_summary) {
+        this._lastSummary = response.neutral_summary;
+      }
+
+      if (!response.insights || response.insights.length === 0) {
+        log('No insights returned from analyzer');
+        return;
+      }
+
+      const newCategories: string[] = [];
+
+      for (const insight of response.insights) {
+        const category = insight.category || 'Insight';
+        const normalizedCategory = category.toLowerCase().replace(/\s+/g, '-');
+
+        if (!this._knownInsightCategories.has(normalizedCategory)) {
+          this._knownInsightCategories.add(normalizedCategory);
+          newCategories.push(category);
+        }
+
+        const insightLog: LogEntry = {
+          uuid: `insight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          event: 'AI Insight',
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          distinctId: 'llm-analyzer',
+          logLevel: category,
+          logTag: 'AI',
+          logMessage: insight.level1,
+          personId: '',
+          properties: {},
+          receivedAt: Date.now(),
+          sourceLogIds,
+          isInsight: true,
+          insightCategory: category,
+          insightColor: insight.icon_color,
+          insightType: insight.insight_type,
+          level2Markdown: insight.level2_markdown
+        };
+
+        this._logs.push(insightLog);
+        this._sendLogToWebview(insightLog);
+      }
+
+      if (newCategories.length > 0) {
+        this._sendNewInsightCategories(newCategories);
+      }
+
+      log(`Generated ${response.insights.length} insight(s) from analyzer`);
+    } catch (error) {
+      log(`Failed to generate insights: ${error}`);
+    }
+  }
+
+  private _sendNewInsightCategories(categories: string[]) {
+    if (this._view) {
+      this._view.webview.postMessage({
+        type: 'newInsightCategories',
+        categories
+      });
+    }
   }
 
   private async _poll(): Promise<void> {
@@ -165,6 +334,11 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
     if (newCount > 0) {
       log(`Fetched ${newCount} new log(s)`);
+
+      if (!this._insightInterval) {
+        this._consecutiveEmptyCycles = 0;
+        this._startInsightGeneration();
+      }
     }
 
     // Clear any previous error on success
@@ -790,6 +964,79 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           color: var(--vscode-foreground);
         }
 
+        /* Insight Cards */
+        .log-card.insight-card {
+          border: 2px solid var(--insight-color, var(--vscode-panel-border));
+          background: var(--insight-bg, var(--vscode-editor-background));
+        }
+        .log-card.insight-card:hover {
+          border-color: var(--insight-color, var(--vscode-focusBorder));
+        }
+        .log-card.insight-card.selected {
+          box-shadow: 0 0 0 1px var(--insight-color, var(--vscode-button-background));
+        }
+        .log-level.insight-level {
+          color: var(--insight-color, var(--vscode-foreground));
+          background: var(--insight-btn-bg, rgba(128,128,128,0.2));
+          border: 1px solid var(--insight-color, var(--vscode-panel-border));
+        }
+        .insight-type-badge {
+          font-size: 9px;
+          padding: 1px 6px;
+          border-radius: 8px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          opacity: 0.8;
+        }
+        .insight-details-toggle {
+          padding: 6px 12px 10px;
+          display: flex;
+          justify-content: flex-start;
+        }
+        .details-btn {
+          background: var(--insight-btn-bg, rgba(128,128,128,0.2));
+          color: var(--insight-color, var(--vscode-foreground));
+          border: 1px solid var(--insight-color, var(--vscode-panel-border));
+          border-radius: 4px;
+          padding: 4px 12px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          letter-spacing: 0.3px;
+          opacity: 0.85;
+        }
+        .details-btn:hover {
+          opacity: 1;
+          box-shadow: 0 0 6px var(--insight-btn-bg, rgba(128,128,128,0.3));
+        }
+        .details-btn:active { transform: scale(0.97); }
+        .insight-level2 {
+          padding: 0 12px;
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s ease, padding 0.3s ease;
+          font-size: 12px;
+          line-height: 1.6;
+          color: var(--vscode-foreground);
+        }
+        .insight-level2.expanded {
+          max-height: 500px;
+          padding: 10px 12px 12px;
+          border-top: 1px solid var(--vscode-panel-border);
+        }
+        .insight-level2 strong { font-weight: 600; }
+        .insight-level2 ul, .insight-level2 ol { margin: 6px 0; padding-left: 18px; }
+        .insight-level2 li { margin: 3px 0; }
+        .insight-level2 code {
+          background: var(--vscode-textCodeBlock-background);
+          padding: 1px 5px;
+          border-radius: 3px;
+          font-family: var(--vscode-editor-font-family), monospace;
+          font-size: 11px;
+        }
+
         .hidden { display: none !important; }
       </style>
     </head>
@@ -818,6 +1065,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           <option value="warn">Warn</option>
           <option value="error">Error</option>
           <option value="critical">Critical</option>
+          <option value="all-insights">All Insights</option>
         </select>
         <span class="result-count" id="result-count"></span>
       </div>
@@ -1095,13 +1343,34 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           return result;
         }
 
-        function filterLogs() {
-          const searchQuery = document.getElementById('search-input').value.trim();
-          const levelFilter = document.getElementById('level-filter').value;
+        var knownInsightCategories = {};
 
-          let filtered = allLogs.filter(log => {
+        function addInsightCategoryToFilter(category) {
+          var normalizedKey = 'insight-' + category.toLowerCase().replace(/\\s+/g, '-');
+          if (knownInsightCategories[normalizedKey]) return;
+          knownInsightCategories[normalizedKey] = true;
+          var select = document.getElementById('level-filter');
+          var option = document.createElement('option');
+          option.value = normalizedKey;
+          option.textContent = '\\u25CF ' + category;
+          select.appendChild(option);
+        }
+
+        function filterLogs() {
+          var searchQuery = document.getElementById('search-input').value.trim();
+          var levelFilter = document.getElementById('level-filter').value;
+
+          var filtered = allLogs.filter(function(log) {
             if (levelFilter !== 'all') {
-              const logLevel = (log.logLevel || '').toLowerCase();
+              if (levelFilter === 'all-insights') {
+                return !!log.isInsight;
+              }
+              if (levelFilter.indexOf('insight-') === 0) {
+                if (!log.isInsight) return false;
+                var catKey = 'insight-' + (log.insightCategory || '').toLowerCase().replace(/\\s+/g, '-');
+                return catKey === levelFilter;
+              }
+              var logLevel = (log.logLevel || '').toLowerCase();
               if (levelFilter === 'warn' && logLevel !== 'warn' && logLevel !== 'warning') return false;
               else if (levelFilter !== 'warn' && logLevel !== levelFilter) return false;
             }
@@ -1219,13 +1488,45 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           container.innerHTML = html;
         }
 
-        function createLogCard(log, index, isSelected, searchIndices) {
-          const levelClass = (log.logLevel || 'info').toLowerCase();
+        function hexToRgb(hex) {
+          var r = parseInt(hex.slice(1, 3), 16);
+          var g = parseInt(hex.slice(3, 5), 16);
+          var b = parseInt(hex.slice(5, 7), 16);
+          return r + ',' + g + ',' + b;
+        }
 
-          let messageIndices = [];
-          let uuidIndices = [];
-          let distinctIdIndices = [];
-          let eventIndices = [];
+        function renderMarkdown(text) {
+          var html = escapeHtml(text);
+          html = html.replace(/\`\`\`([\\s\\S]*?)\`\`\`/g, '<pre><code>$1</code></pre>');
+          html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+          html = html.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+          html = html.replace(/^#{1,6} (.+)$/gm, '<strong>$1</strong>');
+          html = html.replace(/^[\\-\\*] (.+)$/gm, '<li>$1</li>');
+          html = html.replace(/(<li>.*<\\/li>)/s, '<ul>$1</ul>');
+          html = html.replace(/\\n/g, '<br>');
+          return html;
+        }
+
+        function toggleLevel2(id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          var btn = el.previousElementSibling ? el.previousElementSibling.querySelector('.details-btn') : null;
+          if (el.classList.contains('expanded')) {
+            el.classList.remove('expanded');
+            if (btn) btn.textContent = '\\u25B6 Details';
+          } else {
+            el.classList.add('expanded');
+            if (btn) btn.textContent = '\\u25BC Details';
+          }
+        }
+
+        function createLogCard(log, index, isSelected, searchIndices) {
+          var levelClass = (log.logLevel || 'info').toLowerCase();
+
+          var messageIndices = [];
+          var uuidIndices = [];
+          var distinctIdIndices = [];
+          var eventIndices = [];
 
           if (searchIndices && typeof searchIndices === 'object' && !Array.isArray(searchIndices)) {
             messageIndices = searchIndices.message || [];
@@ -1234,13 +1535,50 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
             eventIndices = searchIndices.event || [];
           }
 
-          const messageHtml = messageIndices.length > 0 ? highlightMatches(log.logMessage, messageIndices) : escapeHtml(log.logMessage);
-          const uuidHtml = uuidIndices.length > 0 ? highlightMatches(log.uuid || '', uuidIndices) : escapeHtml(log.uuid || '');
-          const distinctIdHtml = distinctIdIndices.length > 0 ? highlightMatches(log.distinctId || '', distinctIdIndices) : escapeHtml(log.distinctId || '');
-          const eventHtml = eventIndices.length > 0 ? highlightMatches(log.event || '', eventIndices) : escapeHtml(log.event || '');
+          var messageHtml = messageIndices.length > 0 ? highlightMatches(log.logMessage, messageIndices) : escapeHtml(log.logMessage);
+          var uuidHtml = uuidIndices.length > 0 ? highlightMatches(log.uuid || '', uuidIndices) : escapeHtml(log.uuid || '');
+          var distinctIdHtml = distinctIdIndices.length > 0 ? highlightMatches(log.distinctId || '', distinctIdIndices) : escapeHtml(log.distinctId || '');
+          var eventHtml = eventIndices.length > 0 ? highlightMatches(log.event || '', eventIndices) : escapeHtml(log.event || '');
 
-          const selectedClass = isSelected ? 'selected' : '';
-          const checkedClass = isSelected ? 'checked' : '';
+          var selectedClass = isSelected ? 'selected' : '';
+          var checkedClass = isSelected ? 'checked' : '';
+
+          var isInsight = !!log.isInsight;
+          var insightColor = log.insightColor || '';
+          var rgb = insightColor ? hexToRgb(insightColor) : '';
+
+          if (isInsight) {
+            var insightId = 'insight-' + index + '-' + Date.now();
+            var typeLabel = (log.insightType === 'universal') ? 'Universal' : 'Focused';
+
+            var detailsHtml = '';
+            if (log.level2Markdown) {
+              detailsHtml =
+                '<div class="insight-details-toggle">' +
+                  '<button class="details-btn" onclick="event.stopPropagation(); toggleLevel2(\\'' + insightId + '\\')" title="Show detailed analysis">\\u25B6 Details</button>' +
+                '</div>' +
+                '<div class="insight-level2" id="' + insightId + '">' +
+                  renderMarkdown(log.level2Markdown) +
+                '</div>';
+            }
+
+            return '<div class="log-card insight-card ' + selectedClass + '" data-index="' + index + '" ' +
+              'style="--insight-color:' + insightColor + '; --insight-bg:rgba(' + rgb + ',0.08); --insight-btn-bg:rgba(' + rgb + ',0.2);" ' +
+              'onclick="handleLogClick(event, ' + index + ')">' +
+              '<div class="log-header">' +
+                '<div class="log-checkbox ' + checkedClass + '"></div>' +
+                '<span class="log-level insight-level">' + escapeHtml(log.insightCategory || log.logLevel) + '</span>' +
+                '<span class="insight-type-badge" style="background:rgba(' + rgb + ',0.15); color:' + insightColor + ';">' + typeLabel + '</span>' +
+                '<span class="log-timestamp">' + escapeHtml(log.timestamp) + '</span>' +
+                '<span class="log-tag">' + escapeHtml(log.logTag) + '</span>' +
+                '<span class="log-event">' + escapeHtml(log.event) + '</span>' +
+              '</div>' +
+              '<div class="log-body">' +
+                '<div class="log-message">' + messageHtml + '</div>' +
+              '</div>' +
+              detailsHtml +
+            '</div>';
+          }
 
           return '<div class="log-card ' + selectedClass + '" data-index="' + index + '" onclick="handleLogClick(event, ' + index + ')">' +
             '<div class="log-header">' +
@@ -1306,14 +1644,22 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           }
         }
 
-        window.addEventListener('message', event => {
-          const message = event.data;
+        window.addEventListener('message', function(event) {
+          var message = event.data;
           switch (message.type) {
             case 'pollingStatus':
               updatePollingStatus(message.status, message.error);
               break;
             case 'newLog':
+              if (message.log.isInsight && message.log.insightCategory) {
+                addInsightCategoryToFilter(message.log.insightCategory);
+              }
               addLog(message.log);
+              break;
+            case 'newInsightCategories':
+              if (message.categories && Array.isArray(message.categories)) {
+                message.categories.forEach(function(cat) { addInsightCategoryToFilter(cat); });
+              }
               break;
             case 'clearLogs':
               allLogs = [];
@@ -1331,7 +1677,16 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
           }
         });
 
-        ${this._logs.length > 0 ? `allLogs = ${JSON.stringify(this._logs)}; windowEnd = -1; renderFilteredLogs();` : ''}
+        ${this._logs.length > 0 ? `
+          allLogs = ${JSON.stringify(this._logs)};
+          allLogs.forEach(function(log) {
+            if (log.isInsight && log.insightCategory) {
+              addInsightCategoryToFilter(log.insightCategory);
+            }
+          });
+          windowEnd = -1;
+          renderFilteredLogs();
+        ` : ''}
       </script>
     </body>
     </html>`;
