@@ -1,0 +1,88 @@
+{
+  "name": "qapilot",
+  "displayName": "QAPilot",
+  "description": "Real-time PostHog log viewer for VS Code",
+  "version": "0.0.1",
+  "publisher": "qapilot",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "qapilot.fetchLogs",
+        "title": "Show QAPilot Logs",
+        "category": "QAPilot"
+      },
+      {
+        "command": "qapilot.refreshLogs",
+        "title": "Refresh Logs",
+        "icon": "$(refresh)",
+        "category": "QAPilot"
+      },
+      {
+        "command": "qapilot.clearLogs",
+        "title": "Clear Logs",
+        "icon": "$(clear-all)",
+        "category": "QAPilot"
+      },
+      {
+        "command": "qapilot.startPolling",
+        "title": "Start Polling",
+        "icon": "$(play)",
+        "category": "QAPilot"
+      },
+      {
+        "command": "qapilot.stopPolling",
+        "title": "Stop Polling",
+        "icon": "$(debug-stop)",
+        "category": "QAPilot"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "qapilot-panel",
+          "title": "QAPilot",
+          "icon": "$(output)"
+        }
+      ]
+    },
+    "views": {
+      "qapilot-panel": [
+        {
+          "type": "webview",
+          "id": "qapilot.logsView",
+          "name": "Logs"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "qapilot.refreshLogs",
+          "when": "view == qapilot.logsView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/node": "22.x",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.7.0"
+  }
+}
