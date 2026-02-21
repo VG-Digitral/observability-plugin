@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
-import * as https from 'https';
 
 const API_URL = 'https://us6krurah3.execute-api.eu-north-1.amazonaws.com/prod/api/posthog';
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 5000;
 const MAX_LOGS = 500;
 
 function log(message: string): void {
@@ -44,7 +43,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _isFetching = false;
   private _insightInterval: ReturnType<typeof setInterval> | null = null;
   private _lastInsightTime: number = 0;
-  private readonly INSIGHT_INTERVAL_MS = 30000;
+  private readonly INSIGHT_INTERVAL_MS = 5000;
   private _lastSummary: string = '';
   private _consecutiveEmptyCycles: number = 0;
   private readonly MAX_EMPTY_CYCLES = 2;
@@ -89,6 +88,12 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   // ── Polling ───────────────────────────────────────────────────────
 
+  private _currentTimestamp(offsetMinutes: number = 0): string {
+    const d = new Date();
+    if (offsetMinutes) { d.setMinutes(d.getMinutes() - offsetMinutes); }
+    return d.toISOString().replace('T', ' ').substring(0, 19);
+  }
+
   public startPolling() {
     if (this._pollTimer) {
       log('Polling already active');
@@ -98,6 +103,11 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
     this._pollingStatus = 'starting';
     this._pollingError = '';
     this._updateWebviewStatus();
+
+    if (!this._lastTimestamp) {
+      this._lastTimestamp = this._currentTimestamp(5);
+      log(`Starting from 5 minutes ago: ${this._lastTimestamp}`);
+    }
 
     this._poll();
 
@@ -290,24 +300,23 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _fetchLogs(): Promise<void> {
-    let query: string;
-    if (this._lastTimestamp) {
-      query = `SELECT uuid, event, timestamp, distinct_id, properties FROM events WHERE timestamp > '${this._lastTimestamp}' ORDER BY timestamp ASC LIMIT 100`;
-    } else {
-      query = `SELECT uuid, event, timestamp, distinct_id, properties FROM events ORDER BY timestamp DESC LIMIT 100`;
-    }
+    const query = `SELECT uuid, event, timestamp, distinct_id, properties FROM events WHERE timestamp > '${this._lastTimestamp}' ORDER BY timestamp ASC LIMIT 100`;
 
     const response = await this._callApi('hogql_query', { query });
 
     if (!response || !response.data) {
+      log('API returned no data');
       return;
     }
 
     const results: unknown[][] = (response.data.results as unknown[][]) || [];
-    if (results.length === 0) { return; }
+    if (results.length === 0) {
+      log(`No events after ${this._lastTimestamp}`);
+      return;
+    }
 
-    // First fetch returns DESC order — reverse so oldest is first
-    const rows = this._lastTimestamp ? results : [...results].reverse();
+    log(`Got ${results.length} event(s) after ${this._lastTimestamp}`);
+    const rows = results;
 
     let newCount = 0;
     for (const row of rows) {
@@ -351,39 +360,40 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   // ── API ───────────────────────────────────────────────────────────
 
-  private _callApi(action: string, params: Record<string, unknown>): Promise<{ data: Record<string, unknown> }> {
+  private async _callApi(action: string, params: Record<string, unknown>): Promise<{ data: Record<string, unknown> }> {
     const body = JSON.stringify({ action, params });
+    log(`API call: ${action} (${body.length} bytes)`);
 
-    return new Promise((resolve, reject) => {
-      const url = new URL(API_URL);
-      const req = https.request(
-        {
-          hostname: url.hostname,
-          port: 443,
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body)
-          }
-        },
-        (res) => {
-          let data = '';
-          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-          res.on('end', () => {
-            try {
-              resolve(JSON.parse(data));
-            } catch (e) {
-              reject(new Error(`Invalid JSON from API: ${data.substring(0, 200)}`));
-            }
-          });
-        }
-      );
-      req.on('error', reject);
-      req.setTimeout(10000, () => { req.destroy(new Error('API request timeout')); });
-      req.write(body);
-      req.end();
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      console.log('calling API', new Date().toISOString());
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal
+      });
+      console.log('response received from API', new Date().toISOString());
+      clearTimeout(timeoutId);
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}: ${text.substring(0, 200)}`);
+      }
+
+      const parsed = JSON.parse(text) as { data: Record<string, unknown> };
+      console.log('API response', parsed);
+      return parsed;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('API request timeout (20s)');
+      }
+      throw err;
+    }
   }
 
   // ── Log Parsing ───────────────────────────────────────────────────
@@ -468,20 +478,20 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   public refresh() {
-    this._lastTimestamp = null;
+    this._lastTimestamp = this._currentTimestamp(5);
     this._seenUuids.clear();
     this._logs = [];
     if (this._view) {
       this._view.webview.postMessage({ type: 'clearLogs' });
     }
     this._poll();
-    log('Refreshed — refetching all logs');
+    log(`Refreshed — watching for new logs from ${this._lastTimestamp}`);
   }
 
   public clearLogs() {
     this._logs = [];
     this._seenUuids.clear();
-    this._lastTimestamp = null;
+    this._lastTimestamp = this._currentTimestamp(5);
     if (this._view) {
       this._view.webview.postMessage({ type: 'clearLogs' });
     }
@@ -1073,8 +1083,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
       <div class="logs-container" id="logs-container">
         <div class="empty-state">
           <p style="font-size: 24px; margin-bottom: 12px;">&#128225;</p>
-          <p><strong>Connecting to PostHog...</strong></p>
-          <p style="margin-top: 12px; font-size: 11px; opacity: 0.7;">Logs will appear here as they are fetched.</p>
+          <p><strong>Watching for live logs...</strong></p>
         </div>
       </div>
 
@@ -1424,8 +1433,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
             container.innerHTML =
               '<div class="empty-state">' +
               '<p style="font-size: 24px; margin-bottom: 12px;">&#128225;</p>' +
-              '<p><strong>Connecting to PostHog...</strong></p>' +
-              '<p style="margin-top: 12px; font-size: 11px; opacity: 0.7;">Logs will appear here as they are fetched.</p>' +
+              '<p><strong>Watching for live logs...</strong></p>' +
               '</div>';
             resultCount.textContent = '';
             clearSelection();
@@ -1549,8 +1557,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
           if (isInsight) {
             var insightId = 'insight-' + index + '-' + Date.now();
-            var typeLabel = (log.insightType === 'universal') ? 'Universal' : 'Focused';
-
             var detailsHtml = '';
             if (log.level2Markdown) {
               detailsHtml =
@@ -1568,7 +1574,6 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
               '<div class="log-header">' +
                 '<div class="log-checkbox ' + checkedClass + '"></div>' +
                 '<span class="log-level insight-level">' + escapeHtml(log.insightCategory || log.logLevel) + '</span>' +
-                '<span class="insight-type-badge" style="background:rgba(' + rgb + ',0.15); color:' + insightColor + ';">' + typeLabel + '</span>' +
                 '<span class="log-timestamp">' + escapeHtml(log.timestamp) + '</span>' +
                 '<span class="log-tag">' + escapeHtml(log.logTag) + '</span>' +
                 '<span class="log-event">' + escapeHtml(log.event) + '</span>' +
