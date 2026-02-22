@@ -1,13 +1,21 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const API_URL = 'https://us6krurah3.execute-api.eu-north-1.amazonaws.com/prod/api/posthog';
 const POLL_INTERVAL_MS = 5000;
 const MAX_LOGS = 500;
+const VISIBILITY_DELAY_S = 10;
+
+const LOG_FILE = path.join(__dirname, '..', 'poll_debug.log');
+fs.writeFileSync(LOG_FILE, `=== QAPilot Poll Debug Log — ${new Date().toISOString()} ===\n`);
 
 function log(message: string): void {
   const timestamp = new Date().toISOString().substring(11, 19);
-  console.log(`[QAPilot][${timestamp}]`, message);
+  const line = `[QAPilot][${timestamp}] ${message}`;
+  console.log(line);
+  fs.appendFileSync(LOG_FILE, line + '\n');
 }
 
 interface LogEntry {
@@ -38,9 +46,12 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
   private _pollingStatus: PollingStatus = 'stopped';
   private _pollingError: string = '';
-  private _lastTimestamp: string | null = null;
+  private _lastCreatedAt: string | null = null;
   private _seenUuids: Set<string> = new Set();
   private _isFetching = false;
+  private _totalPolled = 0;
+  private _totalSkipped = 0;
+  private _pollCycles = 0;
   private _insightInterval: ReturnType<typeof setInterval> | null = null;
   private _lastInsightTime: number = 0;
   private readonly INSIGHT_INTERVAL_MS = 30000; // 30 seconds
@@ -104,9 +115,9 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
     this._pollingError = '';
     this._updateWebviewStatus();
 
-    if (!this._lastTimestamp) {
-      this._lastTimestamp = this._currentTimestamp(5);
-      log(`Starting from 5 seconds ago: ${this._lastTimestamp}`);
+    if (!this._lastCreatedAt) {
+      this._lastCreatedAt = this._currentTimestamp(5);
+      log(`Starting from 5 seconds ago: ${this._lastCreatedAt}`);
     }
 
     this._poll();
@@ -152,9 +163,10 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private async _generateInsights(): Promise<void> {
     const now = new Date();
+    const safeEnd = new Date(now.getTime() - VISIBILITY_DELAY_S * 1000);
     const startTime = new Date(this._lastInsightTime);
-    this._lastInsightTime = now.getTime();
-    const endTs = now.toISOString();
+    this._lastInsightTime = safeEnd.getTime();
+    const endTs = safeEnd.toISOString();
     const startTs = startTime.toISOString();
 
     log(`Fetching & analyzing logs from ${startTs} to ${endTs}...`);
@@ -290,13 +302,18 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _poll(): Promise<void> {
-    if (this._isFetching) { return; }
+    this._pollCycles++;
+    if (this._isFetching) {
+      this._totalSkipped++;
+      log(`Poll #${this._pollCycles} skipped (still fetching). Total: ${this._totalPolled} polled, ${this._totalSkipped} skipped`);
+      return;
+    }
     this._isFetching = true;
     try {
       await this._fetchLogs();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      log(`Poll error: ${msg}`);
+      log(`Poll #${this._pollCycles} error: ${msg}`);
       this._pollingError = msg;
       this._pollingStatus = 'error';
       this._updateWebviewStatus();
@@ -306,8 +323,8 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _fetchLogs(): Promise<void> {
-    const nowTs = this._currentTimestamp();
-    const query = `SELECT uuid, event, timestamp, distinct_id, properties FROM events WHERE timestamp > '${this._lastTimestamp}' AND timestamp <= '${nowTs}' ORDER BY timestamp ASC LIMIT 100`;
+    const nowTs = this._currentTimestamp(VISIBILITY_DELAY_S);
+    const query = `SELECT uuid, event, timestamp, created_at, distinct_id, properties FROM events WHERE created_at > '${this._lastCreatedAt}' AND created_at <= '${nowTs}' ORDER BY created_at ASC LIMIT 100`;
 
     const response = await this._callApi('hogql_query', { query });
 
@@ -318,11 +335,11 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
     const results: unknown[][] = (response.data.results as unknown[][]) || [];
     if (results.length === 0) {
-      log(`No events after ${this._lastTimestamp}`);
+      log(`No events after ${this._lastCreatedAt}`);
       return;
     }
 
-    log(`Got ${results.length} event(s) after ${this._lastTimestamp}`);
+    log(`Got ${results.length} event(s) after ${this._lastCreatedAt}`);
     const rows = results;
 
     let newCount = 0;
@@ -336,14 +353,10 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
       this._sendLogToWebview(entry);
       newCount++;
 
-      if (!this._lastTimestamp || entry.timestamp > this._lastTimestamp) {
-        this._lastTimestamp = entry.timestamp;
+      const rowCreatedAt = this._formatTimestamp(String(row[3] || ''));
+      if (!this._lastCreatedAt || rowCreatedAt > this._lastCreatedAt) {
+        this._lastCreatedAt = rowCreatedAt;
       }
-    }
-
-    // Ensure we don't cascade backwards through history
-    if (!this._lastTimestamp || this._lastTimestamp < nowTs) {
-      this._lastTimestamp = nowTs;
     }
 
     // Cap stored logs
@@ -352,9 +365,10 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
       for (const r of removed) { this._seenUuids.delete(r.uuid); }
     }
 
-    if (newCount > 0) {
-      log(`Fetched ${newCount} new log(s)`);
+    this._totalPolled += newCount;
+    log(`Poll #${this._pollCycles}: +${newCount} new, ${results.length} returned, ${results.length - newCount} deduped | Total polled: ${this._totalPolled}, cursor: ${this._lastCreatedAt}`);
 
+    if (newCount > 0) {
       if (!this._insightInterval) {
         this._consecutiveEmptyCycles = 0;
         this._startInsightGeneration();
@@ -376,7 +390,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
     log(`API call: ${action} (${body.length} bytes)`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       console.log('calling API', new Date().toISOString());
@@ -410,8 +424,8 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   // ── Log Parsing ───────────────────────────────────────────────────
 
   private _parseRow(row: unknown[]): LogEntry | null {
-    if (!row || row.length < 4) { return null; }
-    const [rawUuid, rawEvent, rawTimestamp, rawDistinctId, rawProps] = row;
+    if (!row || row.length < 5) { return null; }
+    const [rawUuid, rawEvent, rawTimestamp, /* created_at */, rawDistinctId, rawProps] = row;
 
     let properties: Record<string, unknown> = {};
     if (typeof rawProps === 'string') {
@@ -489,20 +503,20 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   public refresh() {
-    this._lastTimestamp = this._currentTimestamp(5);
+    this._lastCreatedAt = this._currentTimestamp(5);
     this._seenUuids.clear();
     this._logs = [];
     if (this._view) {
       this._view.webview.postMessage({ type: 'clearLogs' });
     }
     this._poll();
-    log(`Refreshed — watching for new logs from ${this._lastTimestamp}`);
+    log(`Refreshed — watching for new logs from ${this._lastCreatedAt}`);
   }
 
   public clearLogs() {
     this._logs = [];
     this._seenUuids.clear();
-    this._lastTimestamp = this._currentTimestamp(5);
+    this._lastCreatedAt = this._currentTimestamp(5);
     if (this._view) {
       this._view.webview.postMessage({ type: 'clearLogs' });
     }
