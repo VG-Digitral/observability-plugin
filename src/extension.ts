@@ -43,7 +43,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _isFetching = false;
   private _insightInterval: ReturnType<typeof setInterval> | null = null;
   private _lastInsightTime: number = 0;
-  private readonly INSIGHT_INTERVAL_MS = 5000;
+  private readonly INSIGHT_INTERVAL_MS = 30000; // 30 seconds
   private _lastSummary: string = '';
   private _consecutiveEmptyCycles: number = 0;
   private readonly MAX_EMPTY_CYCLES = 2;
@@ -88,9 +88,9 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   // ── Polling ───────────────────────────────────────────────────────
 
-  private _currentTimestamp(offsetMinutes: number = 0): string {
+  private _currentTimestamp(offsetSeconds: number = 0): string {
     const d = new Date();
-    if (offsetMinutes) { d.setMinutes(d.getMinutes() - offsetMinutes); }
+    if (offsetSeconds) { d.setSeconds(d.getSeconds() - offsetSeconds); }
     return d.toISOString().replace('T', ' ').substring(0, 19);
   }
 
@@ -106,7 +106,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
     if (!this._lastTimestamp) {
       this._lastTimestamp = this._currentTimestamp(5);
-      log(`Starting from 5 minutes ago: ${this._lastTimestamp}`);
+      log(`Starting from 5 seconds ago: ${this._lastTimestamp}`);
     }
 
     this._poll();
@@ -115,7 +115,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
     this._pollingStatus = 'active';
     this._updateWebviewStatus();
-    log('Polling started (every 3 seconds)');
+    log('Polling started (every 5 seconds)');
 
     this._startInsightGeneration();
   }
@@ -151,48 +151,33 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _generateInsights(): Promise<void> {
-    const now = Date.now();
-    const cutoffTime = now - this.INSIGHT_INTERVAL_MS;
+    const now = new Date();
+    const startTime = new Date(this._lastInsightTime);
+    this._lastInsightTime = now.getTime();
+    const endTs = now.toISOString();
+    const startTs = startTime.toISOString();
 
-    const recentLogs = this._logs.filter(l =>
-      l.receivedAt && l.receivedAt >= cutoffTime && !l.isInsight
-    );
-
-    if (recentLogs.length === 0) {
-      this._consecutiveEmptyCycles++;
-      log(`No new logs in the last 30s (empty cycle ${this._consecutiveEmptyCycles}/${this.MAX_EMPTY_CYCLES})`);
-      if (this._consecutiveEmptyCycles >= this.MAX_EMPTY_CYCLES) {
-        log('Circuit breaker: stopping insight generation');
-        this._stopInsightGeneration();
-        this._lastSummary = '';
-      }
-      return;
-    }
-
-    this._consecutiveEmptyCycles = 0;
-    log(`Generating insights for ${recentLogs.length} logs...`);
-
-    const logsText = recentLogs.map(l =>
-      `${l.timestamp} - ${l.logTag} - ${l.logLevel} - ${l.logMessage}`
-    ).join('\n');
-
-    const sourceLogIds = recentLogs.map(l => l.uuid);
+    log(`Fetching & analyzing logs from ${startTs} to ${endTs}...`);
 
     try {
       const body = JSON.stringify({
-        logs_text: logsText,
-        previous_summary: this._lastSummary
+        platform: 'posthog',
+        start_ts: startTs,
+        end_ts: endTs,
+        previous_summary: this._lastSummary || 'System was stable, no anomalies detected.'
       });
+
+      const sourceLogIds: string[] = [];
 
       const result = await new Promise<string>((resolve, reject) => {
         const req = http.request(
           {
-            hostname: '3.228.128.128',
-            port: 80,
-            path: '/agent/analyze',
+            hostname: 'localhost',
+            port: 8001,
+            path: '/fetch_and_analyze',
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-            timeout: 30000
+            timeout: 60000
           },
           (res) => {
             let data = '';
@@ -217,22 +202,43 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
       interface AnalyzeResponse {
         insights: AnalyzeInsight[];
         neutral_summary: string;
+        total_logs?: number;
       }
 
       const response: AnalyzeResponse = JSON.parse(result);
+      log(`Analyzer returned ${response.total_logs ?? '?'} logs, ${response.insights?.length ?? 0} insight(s)`);
 
       if (response.neutral_summary) {
         this._lastSummary = response.neutral_summary;
       }
 
-      if (!response.insights || response.insights.length === 0) {
-        log('No insights returned from analyzer');
+      const hasSubstantiveLogs = (response.total_logs ?? 0) > 1;
+
+      if (!hasSubstantiveLogs) {
+        this._consecutiveEmptyCycles++;
+        log(`No substantive logs from service (empty cycle ${this._consecutiveEmptyCycles}/${this.MAX_EMPTY_CYCLES})`);
+        if (this._consecutiveEmptyCycles >= this.MAX_EMPTY_CYCLES) {
+          log('Circuit breaker: stopping insight generation — no logs from service');
+          this._stopInsightGeneration();
+          this._lastSummary = '';
+        }
+        return;
+      }
+
+      this._consecutiveEmptyCycles = 0;
+
+      const actionableInsights = (response.insights || []).filter(i =>
+        i.category?.toLowerCase() !== 'no anomaly'
+      );
+
+      if (actionableInsights.length === 0) {
+        log('Only "No Anomaly" insights — skipping UI cards');
         return;
       }
 
       const newCategories: string[] = [];
 
-      for (const insight of response.insights) {
+      for (const insight of actionableInsights) {
         const category = insight.category || 'Insight';
         const normalizedCategory = category.toLowerCase().replace(/\s+/g, '-');
 
@@ -268,7 +274,7 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
         this._sendNewInsightCategories(newCategories);
       }
 
-      log(`Generated ${response.insights.length} insight(s) from analyzer`);
+      log(`Generated ${actionableInsights.length} actionable insight(s) from analyzer`);
     } catch (error) {
       log(`Failed to generate insights: ${error}`);
     }
@@ -300,7 +306,8 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _fetchLogs(): Promise<void> {
-    const query = `SELECT uuid, event, timestamp, distinct_id, properties FROM events WHERE timestamp > '${this._lastTimestamp}' ORDER BY timestamp ASC LIMIT 100`;
+    const nowTs = this._currentTimestamp();
+    const query = `SELECT uuid, event, timestamp, distinct_id, properties FROM events WHERE timestamp > '${this._lastTimestamp}' AND timestamp <= '${nowTs}' ORDER BY timestamp ASC LIMIT 100`;
 
     const response = await this._callApi('hogql_query', { query });
 
@@ -329,10 +336,14 @@ class QAPilotViewProvider implements vscode.WebviewViewProvider {
       this._sendLogToWebview(entry);
       newCount++;
 
-      // Track latest timestamp for incremental polls
       if (!this._lastTimestamp || entry.timestamp > this._lastTimestamp) {
         this._lastTimestamp = entry.timestamp;
       }
+    }
+
+    // Ensure we don't cascade backwards through history
+    if (!this._lastTimestamp || this._lastTimestamp < nowTs) {
+      this._lastTimestamp = nowTs;
     }
 
     // Cap stored logs
