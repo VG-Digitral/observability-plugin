@@ -528,6 +528,36 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           font-family: var(--vscode-editor-font-family), monospace;
           font-size: 11px;
         }
+        .go-deeper-container {
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px dashed var(--vscode-panel-border);
+          display: flex;
+          justify-content: flex-start;
+        }
+        .go-deeper-btn {
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          border: none;
+          border-radius: 5px;
+          padding: 6px 16px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: var(--vscode-font-family);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          letter-spacing: 0.3px;
+          transition: all 0.15s ease;
+          box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);
+        }
+        .go-deeper-btn:hover {
+          background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+          transform: translateY(-1px);
+          box-shadow: 0 3px 10px rgba(124, 58, 237, 0.4);
+        }
+        .go-deeper-btn:active { transform: translateY(0); }
 
         .hidden { display: none !important; }
 
@@ -1413,6 +1443,29 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           }
         }
 
+        function goDeeper(index) {
+          var insight = displayedLogs[index];
+          if (!insight || !insight.isInsight) return;
+
+          var parentLogs = [];
+          var ids = insight.sourceLogIds;
+          if (ids && ids.length > 0) {
+            var idSet = {};
+            ids.forEach(function(id) { idSet[id] = true; });
+            parentLogs = allLogs.filter(function(l) { return !l.isInsight && idSet[l.uuid]; });
+          }
+
+          if (parentLogs.length === 0) {
+            parentLogs = allLogs.filter(function(l) { return !l.isInsight; }).slice(-25);
+          }
+
+          var summary = (insight.logMessage || '').substring(0, 200);
+          var message = 'Explain this insight in more depth: "' + summary + '". '
+            + 'Analyze the source logs below, identify the root cause, assess the impact, and suggest specific actionable fixes.';
+
+          openNativeChat(parentLogs, message);
+        }
+
         function createLogCard(log, index, isSelected, searchIndices) {
           var levelClass = (log.logLevel || 'info').toLowerCase();
 
@@ -1450,6 +1503,9 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 '</div>' +
                 '<div class="insight-level2" id="' + insightId + '">' +
                   renderMarkdown(log.level2Markdown) +
+                  '<div class="go-deeper-container">' +
+                    '<button class="go-deeper-btn" onclick="event.stopPropagation(); goDeeper(' + index + ')" title="Analyze source logs in depth">&#128269; Go Deeper</button>' +
+                  '</div>' +
                 '</div>';
             }
 

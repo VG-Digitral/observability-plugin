@@ -168,7 +168,11 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         previous_summary: this._lastSummary || 'System was stable, no anomalies detected.'
       });
 
-      const sourceLogIds: string[] = [];
+      const startFmt = startTs.replace('T', ' ').substring(0, 19);
+      const endFmt = endTs.replace('T', ' ').substring(0, 19);
+      const sourceLogIds = this._logs
+        .filter(l => !l.isInsight && l.timestamp >= startFmt && l.timestamp <= endFmt)
+        .map(l => l.uuid);
 
       const result = await new Promise<string>((resolve, reject) => {
         const req = http.request(
