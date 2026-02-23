@@ -1,13 +1,16 @@
 import * as vscode from 'vscode';
 import { QAPilotViewProvider } from './QAPilotViewProvider.js';
+import * as conversationStore from './conversationStore.js';
 import { log } from './logger.js';
 
 let provider: QAPilotViewProvider;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   log('QAPilot extension is now active!');
 
-  provider = new QAPilotViewProvider(context.extensionUri);
+  await conversationStore.init(context.globalStorageUri, context.secrets);
+
+  provider = new QAPilotViewProvider(context.extensionUri, conversationStore);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(

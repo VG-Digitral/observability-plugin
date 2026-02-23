@@ -7,6 +7,7 @@ import { log } from './logger.js';
 import { callApi } from './api.js';
 import { parseRow, formatTimestamp } from './logParser.js';
 import { getWebviewHtml } from './webviewHtml.js';
+import type * as ConversationStore from './conversationStore.js';
 
 export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'qapilot.logsView';
@@ -28,9 +29,11 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _consecutiveEmptyCycles: number = 0;
   private readonly MAX_EMPTY_CYCLES = 2;
   private _knownInsightCategories: Set<string> = new Set();
-  private _conversationContexts: Map<string, Record<string, unknown>> = new Map();
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _conversationStore: typeof ConversationStore,
+  ) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -403,7 +406,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleNativeChatMessage(logs: LogEntry[], message: string, conversationId: string) {
     try {
-      const existingContext = this._conversationContexts.get(conversationId);
+      const existingContext = await this._conversationStore.load(conversationId);
       const isFollowUp = !!existingContext;
 
       let body: string;
@@ -461,7 +464,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         const parsed = JSON.parse(result);
 
         if (parsed.conversation_context) {
-          this._conversationContexts.set(conversationId, parsed.conversation_context);
+          await this._conversationStore.save(conversationId, parsed.conversation_context);
         }
 
         if (parsed.markdown) {
