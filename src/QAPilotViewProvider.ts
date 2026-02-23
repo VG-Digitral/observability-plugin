@@ -28,6 +28,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _consecutiveEmptyCycles: number = 0;
   private readonly MAX_EMPTY_CYCLES = 2;
   private _knownInsightCategories: Set<string> = new Set();
+  private _conversationContexts: Map<string, Record<string, unknown>> = new Map();
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -402,22 +403,37 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleNativeChatMessage(logs: LogEntry[], message: string, conversationId: string) {
     try {
-      const formattedLogs = logs.map(l =>
-        `[${l.logLevel}] ${l.timestamp} [${l.logTag}] ${l.logMessage}`
-      ).join('\n');
+      const existingContext = this._conversationContexts.get(conversationId);
+      const isFollowUp = !!existingContext;
 
-      const body = JSON.stringify({
-        logs_text: formattedLogs,
-        question: message,
-        conversation_id: conversationId
-      });
+      let body: string;
+      let path: string;
+
+      if (isFollowUp) {
+        path = '/deep_insight/chat';
+        body = JSON.stringify({
+          question: message,
+          conversation_context: existingContext
+        });
+      } else {
+        path = '/deep_insight';
+        const formattedLogs = logs.map(l =>
+          `[${l.logLevel}] ${l.timestamp} [${l.logTag}] ${l.logMessage}`
+        ).join('\n');
+        body = JSON.stringify({
+          logs_text: formattedLogs,
+          question: message
+        });
+      }
+
+      log(`Chat ${isFollowUp ? 'follow-up' : 'initial'} → ${path}`);
 
       const result = await new Promise<string>((resolve, reject) => {
         const req = http.request(
           {
             hostname: 'localhost',
             port: 8001,
-            path: '/deep_insight',
+            path,
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
             timeout: 120000
@@ -443,6 +459,10 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       let content: string;
       try {
         const parsed = JSON.parse(result);
+
+        if (parsed.conversation_context) {
+          this._conversationContexts.set(conversationId, parsed.conversation_context);
+        }
 
         if (parsed.markdown) {
           content = parsed.markdown;
