@@ -516,6 +516,274 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         }
 
         .hidden { display: none !important; }
+
+        /* ── Chat Overlay & Panel ── */
+        .chat-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0, 0, 0, 0.4);
+          z-index: 1999;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.25s ease;
+        }
+        .chat-overlay.visible {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .chat-panel {
+          position: fixed;
+          top: 0; right: -34%; bottom: 0;
+          width: 34%;
+          min-width: 260px;
+          background: var(--vscode-editor-background);
+          border-left: 1px solid var(--vscode-panel-border);
+          z-index: 2000;
+          display: flex;
+          flex-direction: column;
+          transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+        }
+        .chat-panel.open { right: 0; }
+
+        .chat-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          background: var(--vscode-sideBar-background);
+          border-bottom: 1px solid var(--vscode-panel-border);
+          flex-shrink: 0;
+        }
+        .chat-header h3 {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--vscode-foreground);
+          font-family: var(--vscode-font-family);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .chat-close-btn {
+          background: transparent;
+          border: none;
+          color: var(--vscode-descriptionForeground);
+          font-size: 16px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 4px;
+          line-height: 1;
+        }
+        .chat-close-btn:hover {
+          background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
+        }
+
+        .chat-context {
+          padding: 10px 16px;
+          background: var(--vscode-sideBar-background);
+          border-bottom: 1px solid var(--vscode-panel-border);
+          flex-shrink: 0;
+        }
+        .chat-context-title {
+          font-size: 11px;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-font-family);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .chat-context-logs {
+          margin-top: 6px;
+          max-height: 80px;
+          overflow-y: auto;
+          font-size: 10px;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-editor-font-family), monospace;
+          line-height: 1.5;
+        }
+        .chat-context-log {
+          padding: 1px 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .chat-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .chat-msg {
+          max-width: 92%;
+          padding: 10px 14px;
+          border-radius: 12px;
+          font-size: 12px;
+          line-height: 1.6;
+          font-family: var(--vscode-font-family);
+          word-wrap: break-word;
+        }
+        .chat-msg.user {
+          align-self: flex-end;
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          border-bottom-right-radius: 4px;
+        }
+        .chat-msg.assistant {
+          align-self: flex-start;
+          background: var(--vscode-sideBar-background);
+          color: var(--vscode-foreground);
+          border: 1px solid var(--vscode-panel-border);
+          border-bottom-left-radius: 4px;
+        }
+        .chat-msg.error {
+          align-self: flex-start;
+          background: rgba(248, 81, 73, 0.12);
+          color: #f85149;
+          border: 1px solid rgba(248, 81, 73, 0.3);
+          border-bottom-left-radius: 4px;
+        }
+
+        .chat-msg.assistant code {
+          background: var(--vscode-textCodeBlock-background);
+          padding: 1px 5px;
+          border-radius: 3px;
+          font-family: var(--vscode-editor-font-family), monospace;
+          font-size: 11px;
+        }
+        .chat-msg.assistant pre {
+          background: var(--vscode-textCodeBlock-background);
+          padding: 8px 10px;
+          border-radius: 4px;
+          overflow-x: auto;
+          margin: 6px 0;
+          font-size: 11px;
+        }
+        .chat-msg.assistant pre code {
+          background: none;
+          padding: 0;
+        }
+        .chat-msg.assistant ul, .chat-msg.assistant ol {
+          margin: 4px 0;
+          padding-left: 18px;
+        }
+        .chat-msg.assistant li { margin: 2px 0; }
+        .chat-msg.assistant strong { font-weight: 600; }
+
+        .typing-indicator {
+          align-self: flex-start;
+          display: flex;
+          gap: 4px;
+          padding: 12px 16px;
+          background: var(--vscode-sideBar-background);
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 12px;
+          border-bottom-left-radius: 4px;
+        }
+        .typing-dot {
+          width: 6px; height: 6px;
+          border-radius: 50%;
+          background: var(--vscode-descriptionForeground);
+          animation: typingBounce 1.4s ease-in-out infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
+
+        .chat-input-container {
+          display: flex;
+          gap: 8px;
+          padding: 12px 16px;
+          border-top: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-sideBar-background);
+          flex-shrink: 0;
+          align-items: flex-end;
+        }
+        .chat-input {
+          flex: 1;
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-family: var(--vscode-font-family);
+          resize: none;
+          min-height: 36px;
+          max-height: 120px;
+          line-height: 1.4;
+        }
+        .chat-input:focus { outline: none; border-color: var(--vscode-focusBorder); }
+        .chat-input::placeholder { color: var(--vscode-input-placeholderForeground); }
+        .chat-send-btn {
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          font-family: var(--vscode-font-family);
+          white-space: nowrap;
+          transition: background 0.15s;
+        }
+        .chat-send-btn:hover { background: var(--vscode-button-hoverBackground); }
+        .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Floating chat button */
+        .chat-fab {
+          position: fixed;
+          bottom: 70px;
+          right: 16px;
+          width: 40px; height: 40px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          box-shadow: 0 3px 12px rgba(124, 58, 237, 0.4);
+          z-index: 999;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .chat-fab:hover {
+          transform: scale(1.1);
+          box-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);
+        }
+        .chat-fab:active { transform: scale(0.95); }
+
+        .btn-chat-logs {
+          background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+          color: white;
+          border: none;
+          padding: 6px 14px;
+          font-size: 12px;
+          cursor: pointer;
+          border-radius: 5px;
+          font-family: var(--vscode-font-family);
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.15s;
+        }
+        .btn-chat-logs:hover {
+          background: linear-gradient(135deg, #047857 0%, #059669 100%);
+          transform: translateY(-1px);
+        }
+        .btn-chat-logs:active { transform: translateY(0); }
       </style>
     </head>
     <body>
@@ -567,11 +835,41 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
       <div class="selection-toolbar hidden" id="selection-toolbar">
         <span class="selection-count" id="selection-count">0 selected</span>
         <div class="toolbar-divider"></div>
+        <button class="btn-chat-logs" onclick="openNativeChat()">
+          <span>&#128172;</span>
+          Chat with Logs
+        </button>
         <button class="btn-send-agent" onclick="sendToAgent()">
           <span>&#10024;</span>
           Send to Cursor Agent
         </button>
         <button class="btn-clear-selection" onclick="clearSelection()">Clear</button>
+      </div>
+
+      <!-- Floating chat button -->
+      <button class="chat-fab hidden" id="chat-fab" onclick="openNativeChat()" title="Chat with logs">&#128172;</button>
+
+      <!-- Chat overlay -->
+      <div class="chat-overlay" id="chat-overlay" onclick="closeNativeChat()"></div>
+
+      <!-- Chat panel -->
+      <div class="chat-panel" id="chat-panel">
+        <div class="chat-header">
+          <h3><span>&#128172;</span> Chat with Logs</h3>
+          <button class="chat-close-btn" onclick="closeNativeChat()">&#10005;</button>
+        </div>
+        <div class="chat-context" id="chat-context">
+          <div class="chat-context-title">
+            <span>&#128203;</span> Analyzing <span id="chat-log-count">0</span> <span id="chat-context-label">selected</span> log(s)
+          </div>
+          <div class="chat-context-logs" id="chat-context-logs"></div>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-container">
+          <textarea class="chat-input" id="chat-input" placeholder="Ask about these logs..." rows="1"
+                    onkeydown="handleChatKeydown(event)" oninput="autoResizeTextarea(this)"></textarea>
+          <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
+        </div>
       </div>
 
       <script>
@@ -1094,6 +1392,145 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           }
         }
 
+        // ── Native Chat ──
+
+        var chatLogs = [];
+        var conversationId = '';
+        var isWaitingForResponse = false;
+
+        function openNativeChat(overrideLogs, autoMessage) {
+          var logsToAnalyze = [];
+          var contextLabel = 'selected';
+
+          if (overrideLogs && overrideLogs.length > 0) {
+            logsToAnalyze = overrideLogs;
+            contextLabel = 'source';
+          } else if (selectedIndices.size > 0) {
+            var sortedIdx = Array.from(selectedIndices).sort(function(a, b) { return a - b; });
+            logsToAnalyze = sortedIdx.map(function(idx) { return displayedLogs[idx]; }).filter(Boolean);
+            contextLabel = 'selected';
+          } else {
+            logsToAnalyze = allLogs.slice(-25);
+            contextLabel = 'latest';
+          }
+
+          chatLogs = logsToAnalyze;
+          conversationId = 'chat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+
+          document.getElementById('chat-log-count').textContent = chatLogs.length;
+          document.getElementById('chat-context-label').textContent = contextLabel;
+
+          var contextContainer = document.getElementById('chat-context-logs');
+          contextContainer.innerHTML = chatLogs.map(function(l) {
+            return '<div class="chat-context-log">[' + escapeHtml(l.logLevel) + '] ' + escapeHtml(l.timestamp) + ' [' + escapeHtml(l.logTag) + '] ' + escapeHtml((l.logMessage || '').substring(0, 100)) + '</div>';
+          }).join('');
+
+          document.getElementById('chat-messages').innerHTML = '';
+          isWaitingForResponse = false;
+          document.getElementById('chat-send-btn').disabled = false;
+
+          document.getElementById('chat-overlay').classList.add('visible');
+          document.getElementById('chat-panel').classList.add('open');
+          document.getElementById('chat-input').focus();
+
+          if (autoMessage) {
+            document.getElementById('chat-input').value = autoMessage;
+            sendChatMessage();
+          }
+        }
+
+        function closeNativeChat() {
+          document.getElementById('chat-overlay').classList.remove('visible');
+          document.getElementById('chat-panel').classList.remove('open');
+        }
+
+        function sendChatMessage() {
+          var input = document.getElementById('chat-input');
+          var message = input.value.trim();
+          if (!message || isWaitingForResponse) return;
+
+          addChatMessage('user', message);
+          input.value = '';
+          input.style.height = '36px';
+          isWaitingForResponse = true;
+          document.getElementById('chat-send-btn').disabled = true;
+          addTypingIndicator();
+
+          vscode.postMessage({
+            type: 'nativeChatMessage',
+            logs: chatLogs,
+            message: message,
+            conversationId: conversationId
+          });
+        }
+
+        function addChatMessage(role, content, isError) {
+          var container = document.getElementById('chat-messages');
+          var msgDiv = document.createElement('div');
+          var cls = 'chat-msg ' + role;
+          if (isError) cls = 'chat-msg error';
+          msgDiv.className = cls;
+
+          if (role === 'assistant' && !isError) {
+            msgDiv.innerHTML = renderChatMarkdown(content);
+          } else {
+            msgDiv.textContent = content;
+          }
+
+          removeTypingIndicator();
+          container.appendChild(msgDiv);
+          container.scrollTop = container.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+          removeTypingIndicator();
+          var container = document.getElementById('chat-messages');
+          var indicator = document.createElement('div');
+          indicator.className = 'typing-indicator';
+          indicator.id = 'typing-indicator';
+          indicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+          container.appendChild(indicator);
+          container.scrollTop = container.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+          var el = document.getElementById('typing-indicator');
+          if (el) el.remove();
+        }
+
+        function renderChatMarkdown(text) {
+          var html = escapeHtml(text);
+          html = html.replace(/\`\`\`([\\s\\S]*?)\`\`\`/g, '<pre><code>$1</code></pre>');
+          html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+          html = html.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+          html = html.replace(/^#{1,6} (.+)$/gm, '<strong>$1</strong>');
+          html = html.replace(/^[\\-\\*] (.+)$/gm, '<li>$1</li>');
+          html = html.replace(/(<li>.*<\\/li>)/s, '<ul>$1</ul>');
+          html = html.replace(/\\n/g, '<br>');
+          return html;
+        }
+
+        function handleChatKeydown(event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendChatMessage();
+          }
+        }
+
+        function autoResizeTextarea(el) {
+          el.style.height = 'auto';
+          el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+
+        function updateChatFab() {
+          var fab = document.getElementById('chat-fab');
+          if (allLogs.length > 0) {
+            fab.classList.remove('hidden');
+          } else {
+            fab.classList.add('hidden');
+          }
+        }
+
         function addLog(log) {
           const container = document.getElementById('logs-container');
           const inFollowMode = windowEnd === -1;
@@ -1106,6 +1543,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 
           document.getElementById('filter-bar').classList.remove('hidden');
           container.classList.remove('hidden');
+          updateChatFab();
 
           if (inFollowMode && wasAtBottom) {
             renderFilteredLogs();
@@ -1134,6 +1572,13 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 message.categories.forEach(function(cat) { addInsightCategoryToFilter(cat); });
               }
               break;
+            case 'chatResponse':
+              if (message.conversationId === conversationId) {
+                isWaitingForResponse = false;
+                document.getElementById('chat-send-btn').disabled = false;
+                addChatMessage('assistant', message.content, message.isError);
+              }
+              break;
             case 'clearLogs':
               allLogs = [];
               displayedLogs = [];
@@ -1146,6 +1591,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
               updateNewLogsBadge();
               updateScrollButton();
               renderFilteredLogs();
+              updateChatFab();
               break;
           }
         });
@@ -1159,6 +1605,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           });
           windowEnd = -1;
           renderFilteredLogs();
+          updateChatFab();
         ` : ''}
       </script>
     </body>

@@ -66,6 +66,9 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'sendToAgent':
           this._sendLogsToAgent(data.logs);
           break;
+        case 'nativeChatMessage':
+          this._handleNativeChatMessage(data.logs, data.message, data.conversationId);
+          break;
       }
     });
   }
@@ -393,6 +396,80 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       this._view.webview.postMessage({ type: 'clearLogs' });
     }
     vscode.window.showInformationMessage('Logs cleared');
+  }
+
+  // ── Native Chat ──────────────────────────────────────────────────
+
+  private async _handleNativeChatMessage(logs: LogEntry[], message: string, conversationId: string) {
+    try {
+      const formattedLogs = logs.map(l =>
+        `[${l.logLevel}] ${l.timestamp} [${l.logTag}] ${l.logMessage}`
+      ).join('\n');
+
+      const body = JSON.stringify({
+        logs_text: formattedLogs,
+        question: message,
+        conversation_id: conversationId
+      });
+
+      const result = await new Promise<string>((resolve, reject) => {
+        const req = http.request(
+          {
+            hostname: 'localhost',
+            port: 8001,
+            path: '/deep_insight',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+            timeout: 120000
+          },
+          (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => {
+              if (res.statusCode && res.statusCode >= 400) {
+                reject(new Error(`Server returned ${res.statusCode}: ${data}`));
+              } else {
+                resolve(data);
+              }
+            });
+          }
+        );
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out')); });
+        req.write(body);
+        req.end();
+      });
+
+      let content: string;
+      try {
+        const parsed = JSON.parse(result);
+
+        if (parsed.markdown) {
+          content = parsed.markdown;
+        } else {
+          content = parsed.answer || parsed.response || parsed.message || parsed.content || result;
+        }
+      } catch {
+        content = result;
+      }
+
+      this._sendChatResponse(conversationId, content, false);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log(`Chat error: ${msg}`);
+      this._sendChatResponse(conversationId, `Failed to get response: ${msg}`, true);
+    }
+  }
+
+  private _sendChatResponse(conversationId: string, content: string, isError: boolean) {
+    if (this._view) {
+      this._view.webview.postMessage({
+        type: 'chatResponse',
+        conversationId,
+        content,
+        isError
+      });
+    }
   }
 
   // ── Send to Agent ─────────────────────────────────────────────────
