@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { QAPilotViewProvider } from './QAPilotViewProvider.js';
 import * as conversationStore from './conversationStore.js';
+import { CredentialManager } from './credentialManager.js';
 import { log } from './logger.js';
 
 let provider: QAPilotViewProvider;
@@ -14,7 +15,8 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Conversation store init failed (chat history won't persist): ${e}`);
   }
 
-  provider = new QAPilotViewProvider(context.extensionUri, conversationStore);
+  const credentialManager = new CredentialManager(context.secrets);
+  provider = new QAPilotViewProvider(context.extensionUri, conversationStore, credentialManager);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -23,7 +25,12 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  provider.startPolling();
+  const hasCreds = await provider.hasCredentials();
+  if (hasCreds) {
+    provider.startPolling();
+  } else {
+    log('No PostHog credentials configured — waiting for setup');
+  }
 
   context.subscriptions.push(
     vscode.commands.registerCommand('qapilot.refreshLogs', () => {

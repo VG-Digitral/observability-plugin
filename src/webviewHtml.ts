@@ -930,6 +930,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         <h2>QAPilot</h2>
         <span class="spacer"></span>
         <button class="btn" id="clear-btn" onclick="clearLogs()">Clear</button>
+        <button class="btn" id="disconnect-btn" onclick="disconnect()" title="Reset PostHog Credentials">Reset PostHog Credentials</button>
       </div>
 
       <div class="error-banner ${hasError ? '' : 'hidden'}" id="error-banner">
@@ -1036,6 +1037,23 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         function clearLogs() {
           vscode.postMessage({ type: 'clear' });
           clearSelection();
+        }
+
+        var disconnectPending = false;
+        function disconnect() {
+          if (!disconnectPending) {
+            disconnectPending = true;
+            var btn = document.getElementById('disconnect-btn');
+            btn.textContent = 'Sure?';
+            btn.classList.add('btn-primary');
+            setTimeout(function() {
+              disconnectPending = false;
+              btn.textContent = 'Reset PostHog Credentials';
+              btn.classList.remove('btn-primary');
+            }, 3000);
+          } else {
+            vscode.postMessage({ type: 'disconnect' });
+          }
         }
 
         function escapeHtml(text) {
@@ -1879,6 +1897,228 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           renderFilteredLogs();
           updateChatFab();
         ` : ''}
+      </script>
+    </body>
+    </html>`;
+}
+
+export function getSetupHtml(): string {
+  return `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          font-size: 13px;
+          color: var(--vscode-foreground);
+          background: var(--vscode-panel-background);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 24px;
+        }
+        .setup-container {
+          max-width: 420px;
+          width: 100%;
+        }
+        .setup-header {
+          text-align: center;
+          margin-bottom: 28px;
+        }
+        .setup-logo {
+          font-size: 32px;
+          margin-bottom: 12px;
+        }
+        .setup-header h1 {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
+        .setup-header p {
+          color: var(--vscode-descriptionForeground);
+          font-size: 12px;
+          line-height: 1.5;
+        }
+        .form-group {
+          margin-bottom: 16px;
+        }
+        .form-group label {
+          display: block;
+          font-size: 12px;
+          font-weight: 500;
+          margin-bottom: 6px;
+          color: var(--vscode-foreground);
+        }
+        .form-group .hint {
+          font-size: 11px;
+          color: var(--vscode-descriptionForeground);
+          margin-top: 4px;
+          line-height: 1.4;
+        }
+        .form-group input {
+          width: 100%;
+          padding: 8px 10px;
+          font-size: 13px;
+          font-family: var(--vscode-editor-font-family), monospace;
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+          border-radius: 4px;
+          outline: none;
+        }
+        .form-group input:focus {
+          border-color: var(--vscode-focusBorder);
+        }
+        .form-group input::placeholder {
+          color: var(--vscode-input-placeholderForeground);
+        }
+        .connect-btn {
+          width: 100%;
+          padding: 10px;
+          font-size: 13px;
+          font-weight: 500;
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-top: 8px;
+        }
+        .connect-btn:hover {
+          background: var(--vscode-button-hoverBackground);
+        }
+        .connect-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .error-msg {
+          background: rgba(248, 81, 73, 0.15);
+          border: 1px solid rgba(248, 81, 73, 0.4);
+          border-radius: 4px;
+          padding: 10px 12px;
+          color: #f85149;
+          font-size: 12px;
+          margin-top: 12px;
+          display: none;
+          line-height: 1.4;
+        }
+        .success-msg {
+          background: rgba(63, 185, 80, 0.15);
+          border: 1px solid rgba(63, 185, 80, 0.4);
+          border-radius: 4px;
+          padding: 10px 12px;
+          color: #3fb950;
+          font-size: 12px;
+          margin-top: 12px;
+          display: none;
+          line-height: 1.4;
+        }
+        .help-link {
+          display: block;
+          text-align: center;
+          margin-top: 20px;
+          font-size: 11px;
+        }
+        .help-link a {
+          color: var(--vscode-textLink-foreground);
+          text-decoration: none;
+        }
+        .help-link a:hover {
+          text-decoration: underline;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="setup-container">
+        <div class="setup-header">
+          <div class="setup-logo">&#128202;</div>
+          <h1>Connect to PostHog</h1>
+          <p>Enter your PostHog credentials to start viewing live events in QAPilot.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="api-key">Personal API Key</label>
+          <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" />
+          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</div>
+        </div>
+
+        <div class="form-group">
+          <label for="project-id">Project ID</label>
+          <input type="text" id="project-id" placeholder="e.g. 12345" autocomplete="off" />
+          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Project &rarr; Project ID</div>
+        </div>
+
+        <button class="connect-btn" id="connect-btn" onclick="handleConnect()">Connect</button>
+
+        <div class="error-msg" id="error-msg"></div>
+        <div class="success-msg" id="success-msg"></div>
+
+        <div class="help-link">
+          <a href="https://posthog.com/docs/api#personal-api-keys-recommended" target="_blank">
+            How to get your PostHog API key &rarr;
+          </a>
+        </div>
+      </div>
+
+      <script>
+        const vscode = acquireVsCodeApi();
+
+        function handleConnect() {
+          const apiKey = document.getElementById('api-key').value.trim();
+          const projectId = document.getElementById('project-id').value.trim();
+          const errorEl = document.getElementById('error-msg');
+          const successEl = document.getElementById('success-msg');
+          const btn = document.getElementById('connect-btn');
+
+          errorEl.style.display = 'none';
+          successEl.style.display = 'none';
+
+          if (!apiKey) {
+            errorEl.textContent = 'Please enter your PostHog Personal API Key.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          if (!projectId) {
+            errorEl.textContent = 'Please enter your PostHog Project ID.';
+            errorEl.style.display = 'block';
+            return;
+          }
+
+          btn.disabled = true;
+          btn.textContent = 'Connecting...';
+
+          vscode.postMessage({
+            type: 'saveCredentials',
+            apiKey: apiKey,
+            projectId: projectId
+          });
+        }
+
+        window.addEventListener('message', function(event) {
+          const msg = event.data;
+          const errorEl = document.getElementById('error-msg');
+          const successEl = document.getElementById('success-msg');
+          const btn = document.getElementById('connect-btn');
+
+          if (msg.type === 'credentialResult') {
+            if (msg.success) {
+              successEl.textContent = 'Connected successfully! Loading logs...';
+              successEl.style.display = 'block';
+              errorEl.style.display = 'none';
+            } else {
+              errorEl.textContent = msg.error || 'Failed to connect. Check your credentials.';
+              errorEl.style.display = 'block';
+              successEl.style.display = 'none';
+              btn.disabled = false;
+              btn.textContent = 'Connect';
+            }
+          }
+        });
       </script>
     </body>
     </html>`;

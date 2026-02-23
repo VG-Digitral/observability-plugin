@@ -1,8 +1,9 @@
 import { log } from './logger.js';
 import { API_URL } from './constants.js';
+import type { PostHogCredentials } from './credentialManager.js';
 
-export async function callApi(action: string, params: Record<string, unknown>): Promise<{ data: Record<string, unknown> }> {
-  const body = JSON.stringify({ action, params });
+export async function callApi(action: string, params: Record<string, unknown>, credentials: PostHogCredentials): Promise<{ data: Record<string, unknown> }> {
+  const body = JSON.stringify({ action, params, credentials });
   log(`API call: ${action} (${body.length} bytes)`);
 
   const controller = new AbortController();

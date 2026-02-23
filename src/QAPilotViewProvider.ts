@@ -6,8 +6,9 @@ import { POLL_INTERVAL_MS, MAX_LOGS, VISIBILITY_DELAY_S } from './constants.js';
 import { log } from './logger.js';
 import { callApi } from './api.js';
 import { parseRow, formatTimestamp } from './logParser.js';
-import { getWebviewHtml } from './webviewHtml.js';
+import { getWebviewHtml, getSetupHtml } from './webviewHtml.js';
 import type * as ConversationStore from './conversationStore.js';
+import { CredentialManager, type PostHogCredentials } from './credentialManager.js';
 
 export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'qapilot.logsView';
@@ -29,13 +30,15 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _consecutiveEmptyCycles: number = 0;
   private readonly MAX_EMPTY_CYCLES = 2;
   private _knownInsightCategories: Set<string> = new Set();
+  private _credentials: PostHogCredentials | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _conversationStore: typeof ConversationStore,
+    private readonly _credentialManager: CredentialManager,
   ) {}
 
-  public resolveWebviewView(
+  public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
@@ -47,11 +50,13 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri]
     };
 
-    webviewView.webview.html = getWebviewHtml({
-      pollingStatus: this._pollingStatus,
-      pollingError: this._pollingError,
-      logs: this._logs
-    });
+    this._credentials = await this._credentialManager.get();
+
+    if (this._credentials) {
+      this._showLogsView();
+    } else {
+      this._showSetupView();
+    }
 
     webviewView.webview.onDidReceiveMessage(data => {
       switch (data.type) {
@@ -82,8 +87,72 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'deleteChat':
           this._handleDeleteChat(data.conversationId);
           break;
+        case 'saveCredentials':
+          this._handleSaveCredentials(data.apiKey, data.projectId);
+          break;
+        case 'disconnect':
+          this._handleDisconnect();
+          break;
       }
     });
+  }
+
+  // ── View Switching ─────────────────────────────────────────────────
+
+  private _showSetupView() {
+    if (!this._view) { return; }
+    this._view.webview.html = getSetupHtml();
+  }
+
+  private _showLogsView() {
+    if (!this._view) { return; }
+    this._view.webview.html = getWebviewHtml({
+      pollingStatus: this._pollingStatus,
+      pollingError: this._pollingError,
+      logs: this._logs
+    });
+  }
+
+  private async _handleSaveCredentials(apiKey: string, projectId: string) {
+    try {
+      const testCreds: PostHogCredentials = { apiKey, projectId };
+      const testQuery = 'SELECT 1';
+      await callApi('hogql_query', { query: testQuery }, testCreds);
+
+      await this._credentialManager.store(apiKey, projectId);
+      this._credentials = testCreds;
+
+      this._view?.webview.postMessage({ type: 'credentialResult', success: true });
+      log('Credentials saved successfully');
+
+      await new Promise(resolve => setTimeout(resolve, 800));
+      this._showLogsView();
+      this.startPolling();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`Credential validation failed: ${msg}`);
+      this._view?.webview.postMessage({
+        type: 'credentialResult',
+        success: false,
+        error: `Connection failed: ${msg}`
+      });
+    }
+  }
+
+  private async _handleDisconnect() {
+    this.stopPolling();
+    await this._credentialManager.clear();
+    this._credentials = null;
+    this._logs = [];
+    this._seenUuids.clear();
+    this._lastCreatedAt = null;
+    this._showSetupView();
+    log('Disconnected — credentials cleared');
+  }
+
+  public async hasCredentials(): Promise<boolean> {
+    this._credentials = await this._credentialManager.get();
+    return this._credentials !== null;
   }
 
   // ── Polling ───────────────────────────────────────────────────────
@@ -95,6 +164,10 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   public startPolling() {
+    if (!this._credentials) {
+      log('Cannot start polling — no credentials configured');
+      return;
+    }
     if (this._pollTimer) {
       log('Polling already active');
       return;
@@ -151,6 +224,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _generateInsights(): Promise<void> {
+    if (!this._credentials) { return; }
+
     const now = new Date();
     const safeEnd = new Date(now.getTime() - VISIBILITY_DELAY_S * 1000);
     const startTime = new Date(this._lastInsightTime);
@@ -165,7 +240,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         platform: 'posthog',
         start_ts: startTs,
         end_ts: endTs,
-        previous_summary: this._lastSummary || 'System was stable, no anomalies detected.'
+        previous_summary: this._lastSummary || 'System was stable, no anomalies detected.',
+        credentials: this._credentials
       });
 
       const startFmt = startTs.replace('T', ' ').substring(0, 19);
@@ -319,10 +395,12 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _fetchLogs(): Promise<void> {
+    if (!this._credentials) { throw new Error('No credentials'); }
+
     const nowTs = this._currentTimestamp(VISIBILITY_DELAY_S);
     const query = `SELECT uuid, event, timestamp, created_at, distinct_id, properties FROM events WHERE created_at > '${this._lastCreatedAt}' AND created_at <= '${nowTs}' ORDER BY created_at ASC LIMIT 100`;
 
-    const response = await callApi('hogql_query', { query });
+    const response = await callApi('hogql_query', { query }, this._credentials);
 
     if (!response || !response.data) {
       log('API returned no data');
