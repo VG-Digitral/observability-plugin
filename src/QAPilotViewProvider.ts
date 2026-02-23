@@ -73,6 +73,15 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'nativeChatMessage':
           this._handleNativeChatMessage(data.logs, data.message, data.conversationId);
           break;
+        case 'listChats':
+          this._handleListChats();
+          break;
+        case 'loadChat':
+          this._handleLoadChat(data.conversationId);
+          break;
+        case 'deleteChat':
+          this._handleDeleteChat(data.conversationId);
+          break;
       }
     });
   }
@@ -187,7 +196,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         category: string;
         icon_color: string;
         icon_url: string;
-        insight_type: 'universal' | 'sub';
+        insight_type: string;
         level1: string;
         level2_markdown: string;
       }
@@ -255,6 +264,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
           insightCategory: category,
           insightColor: insight.icon_color,
           insightType: insight.insight_type,
+          insightIconUrl: insight.icon_url,
           level2Markdown: insight.level2_markdown
         };
 
@@ -464,7 +474,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         const parsed = JSON.parse(result);
 
         if (parsed.conversation_context) {
-          await this._conversationStore.save(conversationId, parsed.conversation_context);
+          const title = isFollowUp ? undefined : message.substring(0, 60);
+          await this._conversationStore.save(conversationId, parsed.conversation_context, title);
         }
 
         if (parsed.markdown) {
@@ -493,6 +504,38 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         isError
       });
     }
+  }
+
+  // ── Chat History ─────────────────────────────────────────────────
+
+  private _handleListChats() {
+    const chats = this._conversationStore.listAll();
+    this._view?.webview.postMessage({ type: 'chatList', chats });
+  }
+
+  private async _handleLoadChat(conversationId: string) {
+    const context = await this._conversationStore.load(conversationId);
+    if (!context) {
+      this._view?.webview.postMessage({
+        type: 'chatLoaded',
+        conversationId,
+        messages: [],
+        error: 'Conversation not found',
+      });
+      return;
+    }
+
+    const messages = (context as { messages?: { role: string; content: string }[] }).messages || [];
+    this._view?.webview.postMessage({
+      type: 'chatLoaded',
+      conversationId,
+      messages,
+    });
+  }
+
+  private async _handleDeleteChat(conversationId: string) {
+    await this._conversationStore.remove(conversationId);
+    this._handleListChats();
   }
 
   // ── Send to Agent ─────────────────────────────────────────────────

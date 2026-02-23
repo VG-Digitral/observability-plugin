@@ -8,7 +8,11 @@ let provider: QAPilotViewProvider;
 export async function activate(context: vscode.ExtensionContext) {
   log('QAPilot extension is now active!');
 
-  await conversationStore.init(context.globalStorageUri, context.secrets);
+  try {
+    await conversationStore.init(context.globalStorageUri, context.secrets);
+  } catch (e) {
+    log(`Conversation store init failed (chat history won't persist): ${e}`);
+  }
 
   provider = new QAPilotViewProvider(context.extensionUri, conversationStore);
 

@@ -12,7 +12,8 @@ export interface LogEntry {
   isInsight?: boolean;
   insightCategory?: string;
   insightColor?: string;
-  insightType?: 'universal' | 'sub';
+  insightType?: string;
+  insightIconUrl?: string;
   level2Markdown?: string;
   sourceLogIds?: string[];
 }

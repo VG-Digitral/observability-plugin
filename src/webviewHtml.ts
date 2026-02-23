@@ -25,6 +25,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -458,6 +459,19 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           background: var(--insight-btn-bg, rgba(128,128,128,0.2));
           border: 1px solid var(--insight-color, var(--vscode-panel-border));
         }
+        .insight-icon {
+          font-size: 14px;
+          flex-shrink: 0;
+        }
+        .insight-heading {
+          font-weight: 600;
+          font-size: 11px;
+          color: var(--insight-color, var(--vscode-foreground));
+        }
+        .insight-heading .insight-heading-sep {
+          opacity: 0.5;
+          margin: 0 4px;
+        }
         .insight-type-badge {
           font-size: 9px;
           padding: 1px 6px;
@@ -565,6 +579,33 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           align-items: center;
           gap: 6px;
         }
+        .chat-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .chat-history-btn {
+          background: transparent;
+          border: 1px solid var(--vscode-panel-border);
+          color: var(--vscode-descriptionForeground);
+          font-size: 11px;
+          cursor: pointer;
+          padding: 3px 8px;
+          border-radius: 4px;
+          line-height: 1;
+          font-family: var(--vscode-font-family);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .chat-history-btn:hover {
+          background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
+        }
+        .chat-history-btn.active {
+          background: var(--vscode-toolbar-hoverBackground);
+          color: var(--vscode-foreground);
+        }
         .chat-close-btn {
           background: transparent;
           border: none;
@@ -578,6 +619,74 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         .chat-close-btn:hover {
           background: var(--vscode-toolbar-hoverBackground);
           color: var(--vscode-foreground);
+        }
+
+        .chat-history-panel {
+          display: none;
+          flex-direction: column;
+          overflow-y: auto;
+          border-bottom: 1px solid var(--vscode-panel-border);
+          max-height: 240px;
+          flex-shrink: 0;
+        }
+        .chat-history-panel.visible { display: flex; }
+
+        .chat-history-item {
+          display: flex;
+          align-items: center;
+          padding: 8px 16px;
+          gap: 8px;
+          cursor: pointer;
+          border-bottom: 1px solid var(--vscode-panel-border);
+          transition: background 0.15s ease;
+        }
+        .chat-history-item:hover {
+          background: var(--vscode-list-hoverBackground);
+        }
+        .chat-history-item.active {
+          background: var(--vscode-list-activeSelectionBackground);
+          color: var(--vscode-list-activeSelectionForeground);
+        }
+        .chat-history-item-text {
+          flex: 1;
+          min-width: 0;
+        }
+        .chat-history-item-title {
+          font-size: 12px;
+          font-weight: 500;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          font-family: var(--vscode-font-family);
+          color: var(--vscode-foreground);
+        }
+        .chat-history-item-date {
+          font-size: 10px;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-font-family);
+          margin-top: 2px;
+        }
+        .chat-history-delete {
+          background: transparent;
+          border: none;
+          color: var(--vscode-descriptionForeground);
+          font-size: 14px;
+          cursor: pointer;
+          padding: 2px 6px;
+          border-radius: 4px;
+          line-height: 1;
+          flex-shrink: 0;
+        }
+        .chat-history-delete:hover {
+          background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+          color: var(--vscode-errorForeground, #f48771);
+        }
+        .chat-history-empty {
+          padding: 16px;
+          text-align: center;
+          font-size: 11px;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-font-family);
         }
 
         .chat-context {
@@ -856,8 +965,12 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
       <div class="chat-panel" id="chat-panel">
         <div class="chat-header">
           <h3><span>&#128172;</span> Chat with Logs</h3>
-          <button class="chat-close-btn" onclick="closeNativeChat()">&#10005;</button>
+          <div class="chat-header-actions">
+            <button class="chat-history-btn" id="chat-history-btn" onclick="toggleChatHistory()" title="View previous chats">&#128340; Previous Chats</button>
+            <button class="chat-close-btn" onclick="closeNativeChat()">&#10005;</button>
+          </div>
         </div>
+        <div class="chat-history-panel" id="chat-history-panel"></div>
         <div class="chat-context" id="chat-context">
           <div class="chat-context-title">
             <span>&#128203;</span> Analyzing <span id="chat-log-count">0</span> <span id="chat-context-label">selected</span> log(s)
@@ -1281,6 +1394,12 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           return html;
         }
 
+        function faIconClassFromUrl(url) {
+          if (!url) return '';
+          var match = url.match(/icons\\/([a-z0-9-]+)/i);
+          return match ? 'fa-solid fa-' + match[1] : '';
+        }
+
         function toggleLevel2(id) {
           var el = document.getElementById(id);
           if (!el) return;
@@ -1334,12 +1453,23 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 '</div>';
             }
 
+            var iconClass = faIconClassFromUrl(log.insightIconUrl || '');
+            var iconHtml = iconClass
+              ? '<i class="' + iconClass + ' insight-icon" style="color:' + insightColor + '"></i>'
+              : '';
+
+            var headingText = escapeHtml(log.insightCategory || log.logLevel);
+            if (log.insightType) {
+              headingText += '<span class="insight-heading-sep">:</span>' + escapeHtml(log.insightType);
+            }
+
             return '<div class="log-card insight-card ' + selectedClass + '" data-index="' + index + '" ' +
               'style="--insight-color:' + insightColor + '; --insight-bg:rgba(' + rgb + ',0.08); --insight-btn-bg:rgba(' + rgb + ',0.2);" ' +
               'onclick="handleLogClick(event, ' + index + ')">' +
               '<div class="log-header">' +
                 '<div class="log-checkbox ' + checkedClass + '"></div>' +
-                '<span class="log-level insight-level">' + escapeHtml(log.insightCategory || log.logLevel) + '</span>' +
+                iconHtml +
+                '<span class="insight-heading">' + headingText + '</span>' +
                 '<span class="log-timestamp">' + escapeHtml(log.timestamp) + '</span>' +
                 '<span class="log-tag">' + escapeHtml(log.logTag) + '</span>' +
                 '<span class="log-event">' + escapeHtml(log.event) + '</span>' +
@@ -1428,6 +1558,9 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           document.getElementById('chat-messages').innerHTML = '';
           isWaitingForResponse = false;
           document.getElementById('chat-send-btn').disabled = false;
+          document.getElementById('chat-context').style.display = '';
+          document.getElementById('chat-history-panel').classList.remove('visible');
+          document.getElementById('chat-history-btn').classList.remove('active');
 
           document.getElementById('chat-overlay').classList.add('visible');
           document.getElementById('chat-panel').classList.add('open');
@@ -1442,6 +1575,73 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         function closeNativeChat() {
           document.getElementById('chat-overlay').classList.remove('visible');
           document.getElementById('chat-panel').classList.remove('open');
+          document.getElementById('chat-history-panel').classList.remove('visible');
+          document.getElementById('chat-history-btn').classList.remove('active');
+        }
+
+        function toggleChatHistory() {
+          var panel = document.getElementById('chat-history-panel');
+          var btn = document.getElementById('chat-history-btn');
+          if (panel.classList.contains('visible')) {
+            panel.classList.remove('visible');
+            btn.classList.remove('active');
+          } else {
+            btn.classList.add('active');
+            vscode.postMessage({ type: 'listChats' });
+          }
+        }
+
+        function renderChatList(chats) {
+          var panel = document.getElementById('chat-history-panel');
+          panel.classList.add('visible');
+          if (!chats || chats.length === 0) {
+            panel.innerHTML = '<div class="chat-history-empty">No previous chats</div>';
+            return;
+          }
+          panel.innerHTML = chats.map(function(chat) {
+            var date = new Date(chat.updatedAt);
+            var dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                        + ' ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            var activeClass = chat.id === conversationId ? ' active' : '';
+            var safeId = escapeHtml(chat.id);
+            return '<div class="chat-history-item' + activeClass + '" data-chat-id="' + safeId + '">'
+              + '<div class="chat-history-item-text">'
+              + '<div class="chat-history-item-title">' + escapeHtml(chat.title) + '</div>'
+              + '<div class="chat-history-item-date">' + escapeHtml(dateStr) + '</div>'
+              + '</div>'
+              + '<button class="chat-history-delete" data-delete-id="' + safeId + '" title="Delete">&#10005;</button>'
+              + '</div>';
+          }).join('');
+
+          panel.querySelectorAll('.chat-history-item').forEach(function(el) {
+            var chatId = el.getAttribute('data-chat-id');
+            el.addEventListener('click', function() { loadChat(chatId); });
+          });
+          panel.querySelectorAll('.chat-history-delete').forEach(function(el) {
+            var chatId = el.getAttribute('data-delete-id');
+            el.addEventListener('click', function(e) { e.stopPropagation(); deleteChat(chatId); });
+          });
+        }
+
+        function loadChat(chatId) {
+          conversationId = chatId;
+          document.getElementById('chat-context').style.display = 'none';
+          document.getElementById('chat-messages').innerHTML = '';
+          isWaitingForResponse = false;
+          document.getElementById('chat-send-btn').disabled = false;
+          addTypingIndicator();
+          vscode.postMessage({ type: 'loadChat', conversationId: chatId });
+
+          document.getElementById('chat-history-panel').classList.remove('visible');
+          document.getElementById('chat-history-btn').classList.remove('active');
+        }
+
+        function deleteChat(chatId) {
+          vscode.postMessage({ type: 'deleteChat', conversationId: chatId });
+          if (chatId === conversationId) {
+            document.getElementById('chat-messages').innerHTML = '';
+            conversationId = '';
+          }
         }
 
         function sendChatMessage() {
@@ -1577,6 +1777,22 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 isWaitingForResponse = false;
                 document.getElementById('chat-send-btn').disabled = false;
                 addChatMessage('assistant', message.content, message.isError);
+              }
+              break;
+            case 'chatList':
+              renderChatList(message.chats);
+              break;
+            case 'chatLoaded':
+              if (message.conversationId === conversationId) {
+                removeTypingIndicator();
+                document.getElementById('chat-messages').innerHTML = '';
+                if (message.error) {
+                  addChatMessage('assistant', message.error, true);
+                } else if (message.messages) {
+                  message.messages.forEach(function(m) {
+                    addChatMessage(m.role, m.content, false);
+                  });
+                }
               }
               break;
             case 'clearLogs':
