@@ -16,6 +16,8 @@ export interface LogEntry {
   insightIconUrl?: string;
   level2Markdown?: string;
   sourceLogIds?: string[];
+  windowStart?: string;
+  windowEnd?: string;
 }
 
 export type PollingStatus = 'stopped' | 'starting' | 'active' | 'error';

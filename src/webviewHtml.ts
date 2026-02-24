@@ -1499,11 +1499,16 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             parentLogs = allLogs.filter(function(l) { return !l.isInsight; }).slice(-25);
           }
 
+          var previewLogs = parentLogs.slice(0, 25);
+
           var summary = (insight.logMessage || '').substring(0, 200);
           var message = 'Explain this insight in more depth: "' + summary + '". '
             + 'Analyze the source logs below, identify the root cause, assess the impact, and suggest specific actionable fixes.';
 
-          openNativeChat(parentLogs, message);
+          var windowStart = insight.windowStart || '';
+          var windowEnd = insight.windowEnd || '';
+
+          openNativeChat(previewLogs, message, { windowStart: windowStart, windowEnd: windowEnd });
         }
 
         function createLogCard(log, index, isSelected, searchIndices) {
@@ -1624,6 +1629,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         var conversationId = '';
         var isWaitingForResponse = false;
         var allChatsList = [];
+        var goDeeperState = null;
         var historyDropdownRequested = false;
 
         function renderChatTabs() {
@@ -1700,9 +1706,10 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           }
         });
 
-        function openNativeChat(overrideLogs, autoMessage) {
+        function openNativeChat(overrideLogs, autoMessage, goDeeperInfo) {
           var logsToAnalyze = [];
           var contextLabel = 'selected';
+          goDeeperState = goDeeperInfo || null;
 
           if (overrideLogs && overrideLogs.length > 0) {
             logsToAnalyze = overrideLogs;
@@ -1833,12 +1840,19 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           document.getElementById('chat-send-btn').disabled = true;
           addTypingIndicator();
 
-          vscode.postMessage({
+          var chatMsg = {
             type: 'nativeChatMessage',
             logs: chatLogs,
             message: message,
             conversationId: conversationId
-          });
+          };
+          if (goDeeperState) {
+            chatMsg.goDeeper = true;
+            chatMsg.windowStart = goDeeperState.windowStart;
+            chatMsg.windowEnd = goDeeperState.windowEnd;
+            goDeeperState = null;
+          }
+          vscode.postMessage(chatMsg);
         }
 
         function addChatMessage(role, content, isError) {

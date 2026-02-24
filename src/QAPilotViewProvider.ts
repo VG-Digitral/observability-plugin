@@ -76,7 +76,10 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
           this._sendLogsToAgent(data.logs);
           break;
         case 'nativeChatMessage':
-          this._handleNativeChatMessage(data.logs, data.message, data.conversationId);
+          this._handleNativeChatMessage(
+            data.logs, data.message, data.conversationId,
+            data.goDeeper ? { windowStart: data.windowStart, windowEnd: data.windowEnd } : undefined
+          );
           break;
         case 'listChats':
           this._handleListChats();
@@ -340,6 +343,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
           properties: {},
           receivedAt: Date.now(),
           sourceLogIds,
+          windowStart: startTs,
+          windowEnd: endTs,
           isInsight: true,
           insightCategory: category,
           insightColor: insight.icon_color,
@@ -496,7 +501,12 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   // ── Native Chat ──────────────────────────────────────────────────
 
-  private async _handleNativeChatMessage(logs: LogEntry[], message: string, conversationId: string) {
+  private async _handleNativeChatMessage(
+    logs: LogEntry[],
+    message: string,
+    conversationId: string,
+    goDeeperInfo?: { windowStart: string; windowEnd: string }
+  ) {
     try {
       const existingContext = await this._conversationStore.load(conversationId);
       const isFollowUp = !!existingContext;
@@ -509,6 +519,15 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         body = JSON.stringify({
           question: message,
           conversation_context: existingContext
+        });
+      } else if (goDeeperInfo && this._credentials) {
+        path = '/fetch_and_deep_insight';
+        body = JSON.stringify({
+          platform: 'posthog',
+          start_ts: goDeeperInfo.windowStart,
+          end_ts: goDeeperInfo.windowEnd,
+          question: message,
+          credentials: this._credentials
         });
       } else {
         path = '/deep_insight';
