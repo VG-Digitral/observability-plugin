@@ -591,75 +591,94 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         }
         .chat-panel.open { right: 0; }
 
-        .chat-header {
+        .chat-tabs-bar {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px;
+          align-items: stretch;
           background: var(--vscode-sideBar-background);
           border-bottom: 1px solid var(--vscode-panel-border);
           flex-shrink: 0;
+          min-height: 35px;
         }
-        .chat-header h3 {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--vscode-foreground);
-          font-family: var(--vscode-font-family);
+        .chat-tabs-scroll {
           display: flex;
-          align-items: center;
-          gap: 6px;
+          flex: 1;
+          overflow-x: auto;
+          min-width: 0;
         }
-        .chat-header-actions {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .chat-history-btn {
-          background: transparent;
-          border: 1px solid var(--vscode-panel-border);
-          color: var(--vscode-descriptionForeground);
+        .chat-tabs-scroll::-webkit-scrollbar { display: none; }
+        .chat-tab {
+          padding: 8px 14px;
           font-size: 11px;
-          cursor: pointer;
-          padding: 3px 8px;
-          border-radius: 4px;
-          line-height: 1;
           font-family: var(--vscode-font-family);
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          white-space: nowrap;
+          border-right: 1px solid var(--vscode-panel-border);
+          max-width: 150px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          flex-shrink: 0;
+          transition: background 0.15s, color 0.15s;
           display: flex;
           align-items: center;
-          gap: 4px;
         }
-        .chat-history-btn:hover {
-          background: var(--vscode-toolbar-hoverBackground);
+        .chat-tab:hover {
+          background: var(--vscode-list-hoverBackground);
           color: var(--vscode-foreground);
         }
-        .chat-history-btn.active {
-          background: var(--vscode-toolbar-hoverBackground);
+        .chat-tab.active {
           color: var(--vscode-foreground);
+          background: var(--vscode-editor-background);
+          font-weight: 500;
+          border-bottom: 2px solid var(--vscode-focusBorder);
         }
-        .chat-close-btn {
+        .chat-tab-actions {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+        }
+        .chat-tab-btn {
           background: transparent;
           border: none;
           color: var(--vscode-descriptionForeground);
-          font-size: 16px;
+          font-size: 14px;
           cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 4px;
+          padding: 8px 10px;
           line-height: 1;
+          transition: background 0.15s, color 0.15s;
         }
-        .chat-close-btn:hover {
+        .chat-tab-btn:hover {
           background: var(--vscode-toolbar-hoverBackground);
           color: var(--vscode-foreground);
         }
-
-        .chat-history-panel {
+        .chat-history-wrapper {
+          position: relative;
+        }
+        .chat-history-dropdown {
           display: none;
           flex-direction: column;
+          position: absolute;
+          top: 100%;
+          right: 0;
+          width: 280px;
+          max-height: 320px;
           overflow-y: auto;
-          border-bottom: 1px solid var(--vscode-panel-border);
-          max-height: 240px;
-          flex-shrink: 0;
+          background: var(--vscode-editor-background);
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 0 0 6px 6px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+          z-index: 100;
         }
-        .chat-history-panel.visible { display: flex; }
+        .chat-history-dropdown.visible { display: flex; }
+        .chat-history-dropdown-title {
+          padding: 10px 12px 6px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-font-family);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
 
         .chat-history-item {
           display: flex;
@@ -994,14 +1013,17 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 
       <!-- Chat panel -->
       <div class="chat-panel" id="chat-panel">
-        <div class="chat-header">
-          <h3><span>&#128172;</span> Chat with Logs</h3>
-          <div class="chat-header-actions">
-            <button class="chat-history-btn" id="chat-history-btn" onclick="toggleChatHistory()" title="View previous chats">&#128340; Previous Chats</button>
-            <button class="chat-close-btn" onclick="closeNativeChat()">&#10005;</button>
+        <div class="chat-tabs-bar">
+          <div class="chat-tabs-scroll" id="chat-tabs-scroll"></div>
+          <div class="chat-tab-actions">
+            <button class="chat-tab-btn" onclick="startNewChat()" title="New chat">&#43;</button>
+            <div class="chat-history-wrapper">
+              <button class="chat-tab-btn" onclick="toggleChatHistoryDropdown()" title="Chat history">&#128340;</button>
+              <div class="chat-history-dropdown" id="chat-history-dropdown"></div>
+            </div>
+            <button class="chat-tab-btn" onclick="closeNativeChat()" title="Close">&#10005;</button>
           </div>
         </div>
-        <div class="chat-history-panel" id="chat-history-panel"></div>
         <div class="chat-context" id="chat-context">
           <div class="chat-context-title">
             <span>&#128203;</span> Analyzing <span id="chat-log-count">0</span> <span id="chat-context-label">selected</span> log(s)
@@ -1601,6 +1623,82 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         var chatLogs = [];
         var conversationId = '';
         var isWaitingForResponse = false;
+        var allChatsList = [];
+        var historyDropdownRequested = false;
+
+        function renderChatTabs() {
+          var scrollContainer = document.getElementById('chat-tabs-scroll');
+          if (!scrollContainer) return;
+          var tabs = [];
+          var isCurrentInList = allChatsList.some(function(c) { return c.id === conversationId; });
+
+          if (!isCurrentInList && conversationId) {
+            tabs.push({ id: conversationId, title: 'New Chat' });
+          }
+
+          for (var i = 0; i < allChatsList.length && tabs.length < 3; i++) {
+            tabs.push({ id: allChatsList[i].id, title: allChatsList[i].title });
+          }
+
+          scrollContainer.innerHTML = tabs.map(function(tab) {
+            var activeClass = tab.id === conversationId ? ' active' : '';
+            var safeId = escapeHtml(tab.id);
+            var safeTitle = escapeHtml(tab.title);
+            return '<div class="chat-tab' + activeClass + '" data-tab-id="' + safeId + '" title="' + safeTitle + '">' + safeTitle + '</div>';
+          }).join('');
+
+          scrollContainer.querySelectorAll('.chat-tab').forEach(function(el) {
+            var tabId = el.getAttribute('data-tab-id');
+            el.addEventListener('click', function() { switchTab(tabId); });
+          });
+        }
+
+        function switchTab(chatId) {
+          if (chatId === conversationId) return;
+          var isInHistory = allChatsList.some(function(c) { return c.id === chatId; });
+          if (isInHistory) {
+            loadChat(chatId);
+          }
+        }
+
+        function startNewChat() {
+          var newId = 'chat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+          conversationId = newId;
+          var logsToAnalyze = [];
+          var contextLabel = 'latest';
+          if (selectedIndices.size > 0) {
+            var sortedIdx = Array.from(selectedIndices).sort(function(a, b) { return a - b; });
+            logsToAnalyze = sortedIdx.map(function(idx) { return displayedLogs[idx]; }).filter(Boolean);
+            contextLabel = 'selected';
+          } else {
+            logsToAnalyze = allLogs.slice(-25);
+          }
+          chatLogs = logsToAnalyze;
+
+          document.getElementById('chat-log-count').textContent = chatLogs.length;
+          document.getElementById('chat-context-label').textContent = contextLabel;
+          var contextContainer = document.getElementById('chat-context-logs');
+          contextContainer.innerHTML = chatLogs.map(function(l) {
+            return '<div class="chat-context-log">[' + escapeHtml(l.logLevel) + '] ' + escapeHtml(l.timestamp) + ' [' + escapeHtml(l.logTag) + '] ' + escapeHtml((l.logMessage || '').substring(0, 100)) + '</div>';
+          }).join('');
+
+          document.getElementById('chat-messages').innerHTML = '';
+          isWaitingForResponse = false;
+          document.getElementById('chat-send-btn').disabled = false;
+          document.getElementById('chat-context').style.display = '';
+          document.getElementById('chat-history-dropdown').classList.remove('visible');
+          renderChatTabs();
+          document.getElementById('chat-input').focus();
+        }
+
+        document.addEventListener('click', function(e) {
+          var dropdown = document.getElementById('chat-history-dropdown');
+          var wrapper = document.querySelector('.chat-history-wrapper');
+          if (dropdown && dropdown.classList.contains('visible') && wrapper && !wrapper.contains(e.target)) {
+            dropdown.classList.remove('visible');
+            historyDropdownRequested = false;
+          }
+        });
 
         function openNativeChat(overrideLogs, autoMessage) {
           var logsToAnalyze = [];
@@ -1633,11 +1731,12 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           isWaitingForResponse = false;
           document.getElementById('chat-send-btn').disabled = false;
           document.getElementById('chat-context').style.display = '';
-          document.getElementById('chat-history-panel').classList.remove('visible');
-          document.getElementById('chat-history-btn').classList.remove('active');
+          document.getElementById('chat-history-dropdown').classList.remove('visible');
 
           document.getElementById('chat-overlay').classList.add('visible');
           document.getElementById('chat-panel').classList.add('open');
+          renderChatTabs();
+          vscode.postMessage({ type: 'listChats' });
           document.getElementById('chat-input').focus();
 
           if (autoMessage) {
@@ -1649,30 +1748,28 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         function closeNativeChat() {
           document.getElementById('chat-overlay').classList.remove('visible');
           document.getElementById('chat-panel').classList.remove('open');
-          document.getElementById('chat-history-panel').classList.remove('visible');
-          document.getElementById('chat-history-btn').classList.remove('active');
+          document.getElementById('chat-history-dropdown').classList.remove('visible');
         }
 
-        function toggleChatHistory() {
-          var panel = document.getElementById('chat-history-panel');
-          var btn = document.getElementById('chat-history-btn');
-          if (panel.classList.contains('visible')) {
-            panel.classList.remove('visible');
-            btn.classList.remove('active');
+        function toggleChatHistoryDropdown() {
+          var dropdown = document.getElementById('chat-history-dropdown');
+          if (dropdown.classList.contains('visible')) {
+            dropdown.classList.remove('visible');
+            historyDropdownRequested = false;
           } else {
-            btn.classList.add('active');
+            historyDropdownRequested = true;
             vscode.postMessage({ type: 'listChats' });
           }
         }
 
-        function renderChatList(chats) {
-          var panel = document.getElementById('chat-history-panel');
-          panel.classList.add('visible');
+        function renderChatHistoryDropdown(chats) {
+          var dropdown = document.getElementById('chat-history-dropdown');
           if (!chats || chats.length === 0) {
-            panel.innerHTML = '<div class="chat-history-empty">No previous chats</div>';
+            dropdown.innerHTML = '<div class="chat-history-dropdown-title">Chat History</div><div class="chat-history-empty">No previous chats</div>';
             return;
           }
-          panel.innerHTML = chats.map(function(chat) {
+          var html = '<div class="chat-history-dropdown-title">Chat History</div>';
+          html += chats.map(function(chat) {
             var date = new Date(chat.updatedAt);
             var dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                         + ' ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -1687,11 +1784,16 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
               + '</div>';
           }).join('');
 
-          panel.querySelectorAll('.chat-history-item').forEach(function(el) {
+          dropdown.innerHTML = html;
+
+          dropdown.querySelectorAll('.chat-history-item').forEach(function(el) {
             var chatId = el.getAttribute('data-chat-id');
-            el.addEventListener('click', function() { loadChat(chatId); });
+            el.addEventListener('click', function() {
+              dropdown.classList.remove('visible');
+              loadChat(chatId);
+            });
           });
-          panel.querySelectorAll('.chat-history-delete').forEach(function(el) {
+          dropdown.querySelectorAll('.chat-history-delete').forEach(function(el) {
             var chatId = el.getAttribute('data-delete-id');
             el.addEventListener('click', function(e) { e.stopPropagation(); deleteChat(chatId); });
           });
@@ -1705,9 +1807,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           document.getElementById('chat-send-btn').disabled = false;
           addTypingIndicator();
           vscode.postMessage({ type: 'loadChat', conversationId: chatId });
-
-          document.getElementById('chat-history-panel').classList.remove('visible');
-          document.getElementById('chat-history-btn').classList.remove('active');
+          renderChatTabs();
         }
 
         function deleteChat(chatId) {
@@ -1716,6 +1816,9 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             document.getElementById('chat-messages').innerHTML = '';
             conversationId = '';
           }
+          allChatsList = allChatsList.filter(function(c) { return c.id !== chatId; });
+          renderChatTabs();
+          renderChatHistoryDropdown(allChatsList);
         }
 
         function sendChatMessage() {
@@ -1854,7 +1957,13 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
               }
               break;
             case 'chatList':
-              renderChatList(message.chats);
+              allChatsList = message.chats || [];
+              renderChatTabs();
+              if (historyDropdownRequested) {
+                renderChatHistoryDropdown(allChatsList);
+                document.getElementById('chat-history-dropdown').classList.add('visible');
+                historyDropdownRequested = false;
+              }
               break;
             case 'chatLoaded':
               if (message.conversationId === conversationId) {
