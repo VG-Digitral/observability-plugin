@@ -6,7 +6,7 @@ import { POLL_INTERVAL_MS, MAX_LOGS, VISIBILITY_DELAY_S } from './constants.js';
 import { log } from './logger.js';
 import { callApi } from './api.js';
 import { parseRow, formatTimestamp } from './logParser.js';
-import { getWebviewHtml, getSetupHtml } from './webviewHtml.js';
+import { getWebviewHtml, getIntroHtml, getSetupHtml, getOpenAISetupHtml } from './webviewHtml.js';
 import type * as ConversationStore from './conversationStore.js';
 import { CredentialManager, type PostHogCredentials } from './credentialManager.js';
 
@@ -31,6 +31,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private readonly MAX_EMPTY_CYCLES = 2;
   private _knownInsightCategories: Set<string> = new Set();
   private _credentials: PostHogCredentials | null = null;
+  private _openaiKey: string | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -51,11 +52,14 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     };
 
     this._credentials = await this._credentialManager.get();
+    this._openaiKey = await this._credentialManager.getOpenAIKey();
 
-    if (this._credentials) {
+    if (this._credentials && this._openaiKey) {
       this._showLogsView();
+    } else if (this._credentials) {
+      this._showOpenAISetupView();
     } else {
-      this._showSetupView();
+      this._showIntroView();
     }
 
     webviewView.webview.onDidReceiveMessage(data => {
@@ -90,8 +94,14 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'deleteChat':
           this._handleDeleteChat(data.conversationId);
           break;
+        case 'getStarted':
+          this._showSetupView();
+          break;
         case 'saveCredentials':
           this._handleSaveCredentials(data.apiKey, data.projectId);
+          break;
+        case 'saveOpenAIKey':
+          this._handleSaveOpenAIKey(data.openaiKey);
           break;
         case 'disconnect':
           this._handleDisconnect();
@@ -102,9 +112,19 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   // ── View Switching ─────────────────────────────────────────────────
 
+  private _showIntroView() {
+    if (!this._view) { return; }
+    this._view.webview.html = getIntroHtml();
+  }
+
   private _showSetupView() {
     if (!this._view) { return; }
     this._view.webview.html = getSetupHtml();
+  }
+
+  private _showOpenAISetupView() {
+    if (!this._view) { return; }
+    this._view.webview.html = getOpenAISetupHtml();
   }
 
   private _showLogsView() {
@@ -126,11 +146,18 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       this._credentials = testCreds;
 
       this._view?.webview.postMessage({ type: 'credentialResult', success: true });
-      log('Credentials saved successfully');
+      log('PostHog credentials saved successfully');
 
       await new Promise(resolve => setTimeout(resolve, 800));
-      this._showLogsView();
-      this.startPolling();
+
+      const existingOpenAIKey = await this._credentialManager.getOpenAIKey();
+      if (existingOpenAIKey) {
+        this._openaiKey = existingOpenAIKey;
+        this._showLogsView();
+        this.startPolling();
+      } else {
+        this._showOpenAISetupView();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log(`Credential validation failed: ${msg}`);
@@ -142,14 +169,37 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async _handleSaveOpenAIKey(openaiKey: string) {
+    try {
+      await this._credentialManager.storeOpenAIKey(openaiKey);
+      this._openaiKey = openaiKey;
+
+      this._view?.webview.postMessage({ type: 'openaiKeyResult', success: true });
+      log('OpenAI API key saved successfully');
+
+      await new Promise(resolve => setTimeout(resolve, 800));
+      this._showLogsView();
+      this.startPolling();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`Failed to save OpenAI key: ${msg}`);
+      this._view?.webview.postMessage({
+        type: 'openaiKeyResult',
+        success: false,
+        error: `Failed to save key: ${msg}`
+      });
+    }
+  }
+
   private async _handleDisconnect() {
     this.stopPolling();
     await this._credentialManager.clear();
     this._credentials = null;
+    this._openaiKey = null;
     this._logs = [];
     this._seenUuids.clear();
     this._lastCreatedAt = null;
-    this._showSetupView();
+    this._showIntroView();
     log('Disconnected — credentials cleared');
   }
 
@@ -244,7 +294,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         start_ts: startTs,
         end_ts: endTs,
         previous_summary: this._lastSummary || 'System was stable, no anomalies detected.',
-        credentials: this._credentials
+        credentials: this._credentials,
+        openai_api_key: this._openaiKey
       });
 
       const startFmt = startTs.replace('T', ' ').substring(0, 19);
@@ -518,7 +569,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         path = '/deep_insight/chat';
         body = JSON.stringify({
           question: message,
-          conversation_context: existingContext
+          conversation_context: existingContext,
+          openai_api_key: this._openaiKey
         });
       } else if (goDeeperInfo && this._credentials) {
         path = '/fetch_and_deep_insight';
@@ -527,7 +579,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
           start_ts: goDeeperInfo.windowStart,
           end_ts: goDeeperInfo.windowEnd,
           question: message,
-          credentials: this._credentials
+          credentials: this._credentials,
+          openai_api_key: this._openaiKey
         });
       } else {
         path = '/deep_insight';
@@ -536,7 +589,8 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         ).join('\n');
         body = JSON.stringify({
           logs_text: formattedLogs,
-          question: message
+          question: message,
+          openai_api_key: this._openaiKey
         });
       }
 

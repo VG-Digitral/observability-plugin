@@ -949,7 +949,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         <h2>QAPilot</h2>
         <span class="spacer"></span>
         <button class="btn" id="clear-btn" onclick="clearLogs()">Clear</button>
-        <button class="btn" id="disconnect-btn" onclick="disconnect()" title="Reset PostHog Credentials">Reset PostHog Credentials</button>
+        <button class="btn" id="disconnect-btn" onclick="disconnect()" title="Reset API Keys">Reset API Keys</button>
       </div>
 
       <div class="error-banner ${hasError ? '' : 'hidden'}" id="error-banner">
@@ -1045,8 +1045,8 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         let displayedLogs = [];
         let selectedIndices = new Set();
         let lastClickedIndex = -1;
-        const MAX_DISPLAYED_LOGS = 10;
-        const SCROLL_STEP = 5;
+        const MAX_DISPLAYED_LOGS = 50;
+        const SCROLL_STEP = 10;
         let windowEnd = -1;
         let isShiftingWindow = false;
         let currentFiltered = [];
@@ -1070,7 +1070,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             btn.classList.add('btn-primary');
             setTimeout(function() {
               disconnectPending = false;
-              btn.textContent = 'Reset PostHog Credentials';
+              btn.textContent = 'Reset API Keys';
               btn.classList.remove('btn-primary');
             }, 3000);
           } else {
@@ -1146,10 +1146,14 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           renderFilteredLogs();
 
           const container = document.getElementById('logs-container');
-          const topIndicator = document.getElementById('top-indicator');
-          const indicatorHeight = topIndicator ? topIndicator.offsetHeight + 8 : 0;
-          container.scrollTop = Math.max(40, indicatorHeight);
-          setTimeout(() => { isShiftingWindow = false; }, 200);
+          requestAnimationFrame(() => {
+            const anchorDisplayIdx = oldStartIdx - newStartIdx;
+            const cards = container.querySelectorAll('.log-card');
+            if (cards[anchorDisplayIdx]) {
+              container.scrollTop = cards[anchorDisplayIdx].offsetTop;
+            }
+            setTimeout(() => { isShiftingWindow = false; }, 400);
+          });
         }
 
         function shiftWindowDown() {
@@ -1160,6 +1164,8 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           const filtered = currentFiltered;
           const oldEndIdx = windowEnd === -1 ? filtered.length : Math.min(windowEnd, filtered.length);
           if (oldEndIdx >= filtered.length) { isShiftingWindow = false; return; }
+
+          const anchorFilteredIdx = oldEndIdx - 1;
 
           const newEndIdx = Math.min(filtered.length, oldEndIdx + SCROLL_STEP);
           if (newEndIdx >= filtered.length) {
@@ -1173,11 +1179,17 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           renderFilteredLogs();
 
           const container = document.getElementById('logs-container');
-          const bottomIndicator = document.getElementById('bottom-indicator');
-          const indicatorHeight = bottomIndicator ? bottomIndicator.offsetHeight + 8 : 0;
-          const maxScroll = container.scrollHeight - container.clientHeight;
-          container.scrollTop = Math.min(maxScroll - 40, maxScroll - indicatorHeight);
-          setTimeout(() => { isShiftingWindow = false; }, 200);
+          requestAnimationFrame(() => {
+            const actualEnd = windowEnd === -1 ? filtered.length : windowEnd;
+            const newStartIdx = Math.max(0, actualEnd - MAX_DISPLAYED_LOGS);
+            const anchorDisplayIdx = anchorFilteredIdx - newStartIdx;
+            const cards = container.querySelectorAll('.log-card');
+            if (cards[anchorDisplayIdx]) {
+              const card = cards[anchorDisplayIdx];
+              container.scrollTop = card.offsetTop + card.offsetHeight - container.clientHeight;
+            }
+            setTimeout(() => { isShiftingWindow = false; }, 400);
+          });
         }
 
         document.getElementById('logs-container').addEventListener('scroll', function() {
@@ -1186,13 +1198,13 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           const scrollTop = container.scrollTop;
           const distanceFromBottom = container.scrollHeight - scrollTop - container.clientHeight;
 
-          if (scrollTop < 30 && currentFiltered.length > 0) {
+          if (scrollTop < 50 && currentFiltered.length > 0) {
             const endIdx = windowEnd === -1 ? currentFiltered.length : Math.min(windowEnd, currentFiltered.length);
             const startIdx = Math.max(0, endIdx - MAX_DISPLAYED_LOGS);
             if (startIdx > 0) { shiftWindowUp(); return; }
           }
 
-          if (distanceFromBottom < 30 && currentFiltered.length > 0 && windowEnd !== -1) {
+          if (distanceFromBottom < 50 && currentFiltered.length > 0 && windowEnd !== -1) {
             const endIdx = Math.min(windowEnd, currentFiltered.length);
             if (endIdx < currentFiltered.length) { shiftWindowDown(); return; }
           }
@@ -1503,7 +1515,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 
           var summary = (insight.logMessage || '').substring(0, 200);
           var message = 'Explain this insight in more depth: "' + summary + '". '
-            + 'Analyze the source logs below, identify the root cause, assess the impact, and suggest specific actionable fixes.';
+            + 'Analyze and explain the source logs. If any thing looks off, identify the root cause, assess the impact, and suggest specific actionable fixes.';
 
           var windowStart = insight.windowStart || '';
           var windowEnd = insight.windowEnd || '';
@@ -2025,6 +2037,124 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     </html>`;
 }
 
+export function getIntroHtml(): string {
+  return `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          font-size: 13px;
+          color: var(--vscode-foreground);
+          background: var(--vscode-panel-background);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 24px;
+        }
+        .intro-container {
+          max-width: 420px;
+          width: 100%;
+          text-align: center;
+        }
+        .intro-logo {
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+        .intro-container h1 {
+          font-size: 20px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+        .intro-tagline {
+          color: var(--vscode-descriptionForeground);
+          font-size: 13px;
+          line-height: 1.6;
+          margin-bottom: 28px;
+        }
+        .feature-list {
+          text-align: left;
+          margin: 0 auto 32px;
+          max-width: 340px;
+        }
+        .feature-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 14px;
+          font-size: 12px;
+          line-height: 1.5;
+          color: var(--vscode-foreground);
+        }
+        .feature-icon {
+          font-size: 16px;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+        .feature-item strong {
+          font-weight: 600;
+        }
+        .get-started-btn {
+          width: 100%;
+          max-width: 280px;
+          padding: 12px 24px;
+          font-size: 14px;
+          font-weight: 600;
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+        }
+        .get-started-btn:hover {
+          background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+        .get-started-btn:active { transform: translateY(0); }
+      </style>
+    </head>
+    <body>
+      <div class="intro-container">
+        <div class="intro-logo">&#128202;</div>
+        <h1>Welcome to QAPilot</h1>
+        <p class="intro-tagline">AI-powered observability right inside your editor. Connect your logs, get real-time insights, and debug faster.</p>
+
+        <div class="feature-list">
+          <div class="feature-item">
+            <span class="feature-icon">&#128225;</span>
+            <span><strong>Live log streaming</strong> &mdash; Watch events in real time without leaving the IDE.</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">&#9889;</span>
+            <span><strong>AI-driven insights</strong> &mdash; Automatically surfaces error spikes, performance regressions, and anomalies.</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">&#128172;</span>
+            <span><strong>Chat with your logs</strong> &mdash; Ask questions about your logs and get detailed answers.</span>
+          </div>
+        </div>
+
+        <button class="get-started-btn" onclick="getStarted()">Get Started</button>
+      </div>
+
+      <script>
+        const vscode = acquireVsCodeApi();
+        function getStarted() {
+          vscode.postMessage({ type: 'getStarted' });
+        }
+      </script>
+    </body>
+    </html>`;
+}
+
 export function getSetupHtml(): string {
   return `<!DOCTYPE html>
     <html lang="en">
@@ -2065,6 +2195,334 @@ export function getSetupHtml(): string {
           color: var(--vscode-descriptionForeground);
           font-size: 12px;
           line-height: 1.5;
+        }
+        .step-indicator {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 24px;
+        }
+        .step-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--vscode-panel-border);
+        }
+        .step-dot.active {
+          background: var(--vscode-button-background);
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+        }
+        .step-dot.done {
+          background: #3fb950;
+        }
+        .form-group {
+          margin-bottom: 16px;
+        }
+        .form-group label {
+          display: block;
+          font-size: 12px;
+          font-weight: 500;
+          margin-bottom: 6px;
+          color: var(--vscode-foreground);
+        }
+        .form-group .hint {
+          font-size: 11px;
+          color: var(--vscode-descriptionForeground);
+          margin-top: 4px;
+          line-height: 1.4;
+        }
+        .form-group input {
+          width: 100%;
+          padding: 8px 10px;
+          font-size: 13px;
+          font-family: var(--vscode-editor-font-family), monospace;
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+          border-radius: 4px;
+          outline: none;
+        }
+        .form-group input:focus {
+          border-color: var(--vscode-focusBorder);
+        }
+        .form-group input::placeholder {
+          color: var(--vscode-input-placeholderForeground);
+        }
+        .connect-btn {
+          width: 100%;
+          padding: 10px;
+          font-size: 13px;
+          font-weight: 500;
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-top: 8px;
+        }
+        .connect-btn:hover {
+          background: var(--vscode-button-hoverBackground);
+        }
+        .connect-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .error-msg {
+          background: rgba(248, 81, 73, 0.15);
+          border: 1px solid rgba(248, 81, 73, 0.4);
+          border-radius: 4px;
+          padding: 10px 12px;
+          color: #f85149;
+          font-size: 12px;
+          margin-top: 12px;
+          display: none;
+          line-height: 1.4;
+        }
+        .success-msg {
+          background: rgba(63, 185, 80, 0.15);
+          border: 1px solid rgba(63, 185, 80, 0.4);
+          border-radius: 4px;
+          padding: 10px 12px;
+          color: #3fb950;
+          font-size: 12px;
+          margin-top: 12px;
+          display: none;
+          line-height: 1.4;
+        }
+        .help-link {
+          display: block;
+          text-align: center;
+          margin-top: 20px;
+          font-size: 11px;
+        }
+        .help-link a {
+          color: var(--vscode-textLink-foreground);
+          text-decoration: none;
+        }
+        .help-link a:hover {
+          text-decoration: underline;
+        }
+        .platforms-section {
+          margin-top: 36px;
+          text-align: center;
+          background: linear-gradient(135deg, rgba(88, 166, 255, 0.06), rgba(163, 113, 247, 0.06));
+          border: 1px solid rgba(88, 166, 255, 0.15);
+          border-radius: 10px;
+          padding: 22px 20px;
+          position: relative;
+          overflow: hidden;
+        }
+        .platforms-section::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, #58a6ff, #a371f7, #f778ba);
+          opacity: 0.7;
+        }
+        .platforms-icon {
+          font-size: 22px;
+          margin-bottom: 8px;
+        }
+        .platforms-coming-soon {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--vscode-foreground);
+          margin-bottom: 6px;
+        }
+        .platforms-sub {
+          font-size: 11px;
+          color: var(--vscode-descriptionForeground);
+          margin-bottom: 16px;
+        }
+        .platform-request-btn {
+          display: inline-block;
+          padding: 9px 20px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #fff;
+          background: linear-gradient(135deg, #58a6ff, #a371f7);
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          text-decoration: none;
+          transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+          box-shadow: 0 2px 8px rgba(88, 166, 255, 0.25);
+        }
+        .platform-request-btn:hover {
+          opacity: 0.9;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(88, 166, 255, 0.35);
+          text-decoration: none;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="setup-container">
+        <div class="step-indicator">
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+        </div>
+
+        <div class="setup-header">
+          <div class="setup-logo">&#128202;</div>
+          <h1>Connect to PostHog</h1>
+          <p>Enter your PostHog credentials to start viewing live events in QAPilot.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="api-key">Personal API Key</label>
+          <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" />
+          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</div>
+        </div>
+
+        <div class="form-group">
+          <label for="project-id">Project ID</label>
+          <input type="text" id="project-id" placeholder="e.g. 12345" autocomplete="off" />
+          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Project &rarr; Project ID</div>
+        </div>
+
+        <button class="connect-btn" id="connect-btn" onclick="handleConnect()">Connect</button>
+
+        <div class="error-msg" id="error-msg"></div>
+        <div class="success-msg" id="success-msg"></div>
+
+        <div class="help-link">
+          <a href="https://posthog.com/docs/api#personal-api-keys-recommended" target="_blank">
+            How to get your PostHog API key &rarr;
+          </a>
+        </div>
+
+        <div class="platforms-section">
+          <div class="platforms-icon">&#127793;</div>
+          <p class="platforms-coming-soon">More platforms coming soon</p>
+          <p class="platforms-sub">Datadog, Sentry, Grafana and others are on the way!</p>
+          <a class="platform-request-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdabWeB6nQ2WAuYiLOmXKybHc1IQydhV5wUCvTDw7HCAaDrXw/viewform?usp=dialog" target="_blank">
+            Request a platform &rarr;
+          </a>
+        </div>
+      </div>
+
+      <script>
+        const vscode = acquireVsCodeApi();
+
+        function handleConnect() {
+          const apiKey = document.getElementById('api-key').value.trim();
+          const projectId = document.getElementById('project-id').value.trim();
+          const errorEl = document.getElementById('error-msg');
+          const successEl = document.getElementById('success-msg');
+          const btn = document.getElementById('connect-btn');
+
+          errorEl.style.display = 'none';
+          successEl.style.display = 'none';
+
+          if (!apiKey) {
+            errorEl.textContent = 'Please enter your PostHog Personal API Key.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          if (!projectId) {
+            errorEl.textContent = 'Please enter your PostHog Project ID.';
+            errorEl.style.display = 'block';
+            return;
+          }
+
+          btn.disabled = true;
+          btn.textContent = 'Connecting...';
+
+          vscode.postMessage({
+            type: 'saveCredentials',
+            apiKey: apiKey,
+            projectId: projectId
+          });
+        }
+
+        window.addEventListener('message', function(event) {
+          const msg = event.data;
+          const errorEl = document.getElementById('error-msg');
+          const successEl = document.getElementById('success-msg');
+          const btn = document.getElementById('connect-btn');
+
+          if (msg.type === 'credentialResult') {
+            if (msg.success) {
+              successEl.textContent = 'Connected successfully!';
+              successEl.style.display = 'block';
+              errorEl.style.display = 'none';
+            } else {
+              errorEl.textContent = msg.error || 'Failed to connect. Check your credentials.';
+              errorEl.style.display = 'block';
+              successEl.style.display = 'none';
+              btn.disabled = false;
+              btn.textContent = 'Connect';
+            }
+          }
+        });
+      </script>
+    </body>
+    </html>`;
+}
+
+export function getOpenAISetupHtml(): string {
+  return `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          font-size: 13px;
+          color: var(--vscode-foreground);
+          background: var(--vscode-panel-background);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 24px;
+        }
+        .setup-container {
+          max-width: 420px;
+          width: 100%;
+        }
+        .setup-header {
+          text-align: center;
+          margin-bottom: 28px;
+        }
+        .setup-logo {
+          font-size: 32px;
+          margin-bottom: 12px;
+        }
+        .setup-header h1 {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
+        .setup-header p {
+          color: var(--vscode-descriptionForeground);
+          font-size: 12px;
+          line-height: 1.5;
+        }
+        .step-indicator {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 24px;
+        }
+        .step-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--vscode-panel-border);
+        }
+        .step-dot.active {
+          background: var(--vscode-button-background);
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+        }
+        .step-dot.done {
+          background: #3fb950;
         }
         .form-group {
           margin-bottom: 16px;
@@ -2158,32 +2616,32 @@ export function getSetupHtml(): string {
     </head>
     <body>
       <div class="setup-container">
+        <div class="step-indicator">
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+        </div>
+
         <div class="setup-header">
-          <div class="setup-logo">&#128202;</div>
-          <h1>Connect to PostHog</h1>
-          <p>Enter your PostHog credentials to start viewing live events in QAPilot.</p>
+          <div class="setup-logo">&#129302;</div>
+          <h1>Connect OpenAI</h1>
+          <p>QAPilot uses OpenAI to analyze your logs and generate insights. Enter your API key to enable AI features.</p>
         </div>
 
         <div class="form-group">
-          <label for="api-key">Personal API Key</label>
-          <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" />
-          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</div>
+          <label for="openai-key">OpenAI API Key</label>
+          <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" />
+          <div class="hint">Find this at <strong>platform.openai.com</strong> &rarr; API Keys</div>
         </div>
 
-        <div class="form-group">
-          <label for="project-id">Project ID</label>
-          <input type="text" id="project-id" placeholder="e.g. 12345" autocomplete="off" />
-          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Project &rarr; Project ID</div>
-        </div>
-
-        <button class="connect-btn" id="connect-btn" onclick="handleConnect()">Connect</button>
+        <button class="connect-btn" id="save-btn" onclick="handleSave()">Save &amp; Continue</button>
 
         <div class="error-msg" id="error-msg"></div>
         <div class="success-msg" id="success-msg"></div>
 
         <div class="help-link">
-          <a href="https://posthog.com/docs/api#personal-api-keys-recommended" target="_blank">
-            How to get your PostHog API key &rarr;
+          <a href="https://platform.openai.com/api-keys" target="_blank">
+            Get your OpenAI API key &rarr;
           </a>
         </div>
       </div>
@@ -2191,34 +2649,33 @@ export function getSetupHtml(): string {
       <script>
         const vscode = acquireVsCodeApi();
 
-        function handleConnect() {
-          const apiKey = document.getElementById('api-key').value.trim();
-          const projectId = document.getElementById('project-id').value.trim();
+        function handleSave() {
+          const openaiKey = document.getElementById('openai-key').value.trim();
           const errorEl = document.getElementById('error-msg');
           const successEl = document.getElementById('success-msg');
-          const btn = document.getElementById('connect-btn');
+          const btn = document.getElementById('save-btn');
 
           errorEl.style.display = 'none';
           successEl.style.display = 'none';
 
-          if (!apiKey) {
-            errorEl.textContent = 'Please enter your PostHog Personal API Key.';
+          if (!openaiKey) {
+            errorEl.textContent = 'Please enter your OpenAI API key.';
             errorEl.style.display = 'block';
             return;
           }
-          if (!projectId) {
-            errorEl.textContent = 'Please enter your PostHog Project ID.';
+
+          if (!openaiKey.startsWith('sk-')) {
+            errorEl.textContent = 'OpenAI API keys typically start with "sk-". Please check your key.';
             errorEl.style.display = 'block';
             return;
           }
 
           btn.disabled = true;
-          btn.textContent = 'Connecting...';
+          btn.textContent = 'Saving...';
 
           vscode.postMessage({
-            type: 'saveCredentials',
-            apiKey: apiKey,
-            projectId: projectId
+            type: 'saveOpenAIKey',
+            openaiKey: openaiKey
           });
         }
 
@@ -2226,19 +2683,19 @@ export function getSetupHtml(): string {
           const msg = event.data;
           const errorEl = document.getElementById('error-msg');
           const successEl = document.getElementById('success-msg');
-          const btn = document.getElementById('connect-btn');
+          const btn = document.getElementById('save-btn');
 
-          if (msg.type === 'credentialResult') {
+          if (msg.type === 'openaiKeyResult') {
             if (msg.success) {
-              successEl.textContent = 'Connected successfully! Loading logs...';
+              successEl.textContent = 'API key saved! Starting QAPilot...';
               successEl.style.display = 'block';
               errorEl.style.display = 'none';
             } else {
-              errorEl.textContent = msg.error || 'Failed to connect. Check your credentials.';
+              errorEl.textContent = msg.error || 'Failed to save API key.';
               errorEl.style.display = 'block';
               successEl.style.display = 'none';
               btn.disabled = false;
-              btn.textContent = 'Connect';
+              btn.textContent = 'Save & Continue';
             }
           }
         });
