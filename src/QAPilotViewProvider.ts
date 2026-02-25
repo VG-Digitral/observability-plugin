@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
+import * as https from 'https';
 
 import { LogEntry, PollingStatus } from './types.js';
 import { POLL_INTERVAL_MS, MAX_LOGS, VISIBILITY_DELAY_S } from './constants.js';
@@ -305,10 +306,9 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         .map(l => l.uuid);
 
       const result = await new Promise<string>((resolve, reject) => {
-        const req = http.request(
+        const req = https.request(
           {
-            hostname: 'localhost',
-            port: 8001,
+            hostname: '4uyj2dfeujg7r6rhg3nvdkrwfy0schxe.lambda-url.us-east-1.on.aws',
             path: '/fetch_and_analyze',
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
@@ -597,10 +597,9 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       log(`Chat ${isFollowUp ? 'follow-up' : 'initial'} → ${path}`);
 
       const result = await new Promise<string>((resolve, reject) => {
-        const req = http.request(
+        const req = https.request(
           {
-            hostname: 'localhost',
-            port: 8001,
+            hostname: '4uyj2dfeujg7r6rhg3nvdkrwfy0schxe.lambda-url.us-east-1.on.aws',
             path,
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
