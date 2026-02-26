@@ -5,3 +5,6 @@ src/**
 .env
 tsconfig.json
 node_modules/**
+*.log
+poll_debug.log
+patches/**

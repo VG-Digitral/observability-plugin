@@ -942,6 +942,56 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           transform: translateY(-1px);
         }
         .btn-chat-logs:active { transform: translateY(0); }
+
+        .settings-wrap {
+          position: relative;
+          display: inline-block;
+        }
+        .btn-settings {
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
+          border: none;
+          padding: 4px 8px;
+          font-size: 11px;
+          cursor: pointer;
+          border-radius: 3px;
+          font-family: var(--vscode-font-family);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .btn-settings:hover { background: var(--vscode-button-secondaryHoverBackground); }
+        .settings-dropdown {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          margin-top: 4px;
+          min-width: 160px;
+          background: var(--vscode-dropdown-background);
+          border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+          border-radius: 4px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          z-index: 1000;
+          padding: 4px 0;
+        }
+        .settings-dropdown.hidden {
+          display: none;
+        }
+        .settings-dropdown button {
+          display: block;
+          width: 100%;
+          text-align: left;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-family: var(--vscode-font-family);
+          color: var(--vscode-foreground);
+          background: none;
+          border: none;
+          cursor: pointer;
+        }
+        .settings-dropdown button:hover {
+          background: var(--vscode-list-hoverBackground);
+        }
       </style>
     </head>
     <body>
@@ -949,7 +999,13 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         <h2>QAPilot</h2>
         <span class="spacer"></span>
         <button class="btn" id="clear-btn" onclick="clearLogs()">Clear</button>
-        <button class="btn" id="disconnect-btn" onclick="disconnect()" title="Reset API Keys">Reset API Keys</button>
+        <div class="settings-wrap" id="settings-wrap">
+          <button class="btn-settings" id="settings-btn" onclick="toggleSettingsDropdown(event)" title="Change PostHog or OpenAI API key">Reset API Keys</button>
+          <div class="settings-dropdown hidden" id="settings-dropdown">
+            <button type="button" onclick="changePostHogKey()">Change PostHog Key</button>
+            <button type="button" onclick="changeOpenAIKey()">Change OpenAI Key</button>
+          </div>
+        </div>
       </div>
 
       <div class="error-banner ${hasError ? '' : 'hidden'}" id="error-banner">
@@ -1061,22 +1117,32 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           clearSelection();
         }
 
-        var disconnectPending = false;
-        function disconnect() {
-          if (!disconnectPending) {
-            disconnectPending = true;
-            var btn = document.getElementById('disconnect-btn');
-            btn.textContent = 'Sure?';
-            btn.classList.add('btn-primary');
-            setTimeout(function() {
-              disconnectPending = false;
-              btn.textContent = 'Reset API Keys';
-              btn.classList.remove('btn-primary');
-            }, 3000);
-          } else {
-            vscode.postMessage({ type: 'disconnect' });
-          }
+        function toggleSettingsDropdown(ev) {
+          ev.stopPropagation();
+          var dd = document.getElementById('settings-dropdown');
+          dd.classList.toggle('hidden');
         }
+
+        function closeSettingsDropdown() {
+          document.getElementById('settings-dropdown').classList.add('hidden');
+        }
+
+        function changePostHogKey() {
+          closeSettingsDropdown();
+          vscode.postMessage({ type: 'resetPostHogKey' });
+        }
+
+        function changeOpenAIKey() {
+          closeSettingsDropdown();
+          vscode.postMessage({ type: 'resetOpenAIKey' });
+        }
+
+        document.addEventListener('click', function() {
+          closeSettingsDropdown();
+        });
+        document.getElementById('settings-wrap')?.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+        });
 
         function escapeHtml(text) {
           const div = document.createElement('div');

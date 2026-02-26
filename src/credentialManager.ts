@@ -33,6 +33,15 @@ export class CredentialManager {
     await this._secrets.store(KEY_OPENAI_KEY, key);
   }
 
+  async clearPostHog(): Promise<void> {
+    await this._secrets.delete(KEY_API_KEY);
+    await this._secrets.delete(KEY_PROJECT_ID);
+  }
+
+  async clearOpenAIKey(): Promise<void> {
+    await this._secrets.delete(KEY_OPENAI_KEY);
+  }
+
   async clear(): Promise<void> {
     await this._secrets.delete(KEY_API_KEY);
     await this._secrets.delete(KEY_PROJECT_ID);

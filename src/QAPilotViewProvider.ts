@@ -104,6 +104,12 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'saveOpenAIKey':
           this._handleSaveOpenAIKey(data.openaiKey);
           break;
+        case 'resetPostHogKey':
+          this._handleResetPostHogKey();
+          break;
+        case 'resetOpenAIKey':
+          this._handleResetOpenAIKey();
+          break;
         case 'disconnect':
           this._handleDisconnect();
           break;
@@ -190,6 +196,25 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         error: `Failed to save key: ${msg}`
       });
     }
+  }
+
+  private async _handleResetPostHogKey() {
+    this.stopPolling();
+    await this._credentialManager.clearPostHog();
+    this._credentials = null;
+    this._logs = [];
+    this._seenUuids.clear();
+    this._lastCreatedAt = null;
+    this._showSetupView();
+    log('PostHog credentials cleared — showing setup');
+  }
+
+  private async _handleResetOpenAIKey() {
+    this.stopPolling();
+    await this._credentialManager.clearOpenAIKey();
+    this._openaiKey = null;
+    this._showOpenAISetupView();
+    log('OpenAI key cleared — showing setup');
   }
 
   private async _handleDisconnect() {
