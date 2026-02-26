@@ -409,7 +409,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           background: var(--vscode-panel-border);
         }
         .btn-send-agent {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
           color: white;
           border: none;
           padding: 6px 14px;
@@ -424,7 +424,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           transition: all 0.15s;
         }
         .btn-send-agent:hover {
-          background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+          background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
           transform: translateY(-1px);
         }
         .btn-send-agent:active { transform: translateY(0); }
@@ -536,7 +536,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           justify-content: flex-start;
         }
         .go-deeper-btn {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
           color: white;
           border: none;
           border-radius: 5px;
@@ -550,12 +550,12 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           gap: 6px;
           letter-spacing: 0.3px;
           transition: all 0.15s ease;
-          box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
         }
         .go-deeper-btn:hover {
-          background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+          background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
           transform: translateY(-1px);
-          box-shadow: 0 3px 10px rgba(124, 58, 237, 0.4);
+          box-shadow: 0 3px 10px rgba(37, 99, 235, 0.4);
         }
         .go-deeper-btn:active { transform: translateY(0); }
 
@@ -2109,7 +2109,8 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     </html>`;
 }
 
-export function getIntroHtml(): string {
+export function getIntroHtml(options?: { posthogLogoUri?: string }): string {
+  const logoSrc = options?.posthogLogoUri ?? '';
   return `<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -2134,8 +2135,14 @@ export function getIntroHtml(): string {
           text-align: center;
         }
         .intro-logo {
-          font-size: 48px;
           margin-bottom: 16px;
+          display: flex;
+          justify-content: center;
+        }
+        .intro-logo img {
+          width: 48px;
+          height: 48px;
+          border-radius: 10px;
         }
         .intro-container h1 {
           font-size: 20px;
@@ -2177,25 +2184,25 @@ export function getIntroHtml(): string {
           font-size: 14px;
           font-weight: 600;
           font-family: var(--vscode-font-family), system-ui, sans-serif;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
           color: white;
           border: none;
           border-radius: 6px;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
         }
         .get-started-btn:hover {
-          background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+          background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
           transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
         }
         .get-started-btn:active { transform: translateY(0); }
       </style>
     </head>
     <body>
       <div class="intro-container">
-        <div class="intro-logo">&#128202;</div>
+        <div class="intro-logo"><img src="${escapeHtml(logoSrc)}" alt="PostHog" /></div>
         <h1>Welcome to QAPilot</h1>
         <p class="intro-tagline">AI-powered observability right inside your editor. Connect your logs, get real-time insights, and debug faster.</p>
 
@@ -2231,12 +2238,21 @@ export interface SetupHtmlOptions {
   prefilledApiKey?: string;
   prefilledProjectId?: string;
   showBackButton?: boolean;
+  /** Resolved URI for the local PostHog logomark (media/posthog-logomark.svg). */
+  posthogLogomarkUri?: string;
+  /** Resolved URIs for platform icons in media/ (datadog.svg, sentry.svg, grafana.svg). */
+  platformIconUris?: { datadog: string; sentry: string; grafana: string };
 }
 
 export function getSetupHtml(options?: SetupHtmlOptions): string {
   const apiKey = options?.prefilledApiKey ?? '';
   const projectId = options?.prefilledProjectId ?? '';
   const showBack = options?.showBackButton ?? false;
+  const logomarkSrc = options?.posthogLogomarkUri ?? 'https://posthog.com/brand/posthog-logomark.svg';
+  const icons = options?.platformIconUris;
+  const datadogSrc = icons?.datadog ?? '';
+  const sentrySrc = icons?.sentry ?? '';
+  const grafanaSrc = icons?.grafana ?? '';
   return `<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -2267,6 +2283,12 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           font-size: 32px;
           margin-bottom: 12px;
         }
+        .setup-logo img {
+          width: 40px;
+          height: 40px;
+          display: block;
+          margin: 0 auto;
+        }
         .setup-header h1 {
           font-size: 18px;
           font-weight: 600;
@@ -2291,7 +2313,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         }
         .step-dot.active {
           background: var(--vscode-button-background);
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         }
         .step-dot.done {
           background: #3fb950;
@@ -2408,24 +2430,30 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         .platforms-section {
           margin-top: 36px;
           text-align: center;
-          background: linear-gradient(135deg, rgba(88, 166, 255, 0.06), rgba(163, 113, 247, 0.06));
-          border: 1px solid rgba(88, 166, 255, 0.15);
+          background: var(--vscode-editor-inactiveSelectionBackground);
+          border: 1px solid var(--vscode-panel-border);
           border-radius: 10px;
           padding: 22px 20px;
           position: relative;
-          overflow: hidden;
         }
-        .platforms-section::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 2px;
-          background: linear-gradient(90deg, #58a6ff, #a371f7, #f778ba);
-          opacity: 0.7;
+        .platforms-icons-row {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 12px;
         }
-        .platforms-icon {
-          font-size: 22px;
-          margin-bottom: 8px;
+        .platforms-icons-row .platform-icon {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .platforms-icons-row .platform-icon svg {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
         .platforms-coming-soon {
           font-size: 13px;
@@ -2443,19 +2471,17 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           padding: 9px 20px;
           font-size: 12px;
           font-weight: 500;
-          color: #fff;
-          background: linear-gradient(135deg, #58a6ff, #a371f7);
+          color: var(--vscode-button-foreground);
+          background: var(--vscode-button-background);
           border: none;
           border-radius: 6px;
           cursor: pointer;
           text-decoration: none;
-          transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-          box-shadow: 0 2px 8px rgba(88, 166, 255, 0.25);
+          transition: opacity 0.2s;
         }
         .platform-request-btn:hover {
           opacity: 0.9;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 14px rgba(88, 166, 255, 0.35);
+          color: var(--vscode-button-foreground);
           text-decoration: none;
         }
       </style>
@@ -2470,7 +2496,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         </div>
 
         <div class="setup-header">
-          <div class="setup-logo">&#128202;</div>
+          <div class="setup-logo"><img src="${escapeHtml(logomarkSrc)}" alt="PostHog" /></div>
           <h1>Connect to PostHog</h1>
           <p>Enter your PostHog credentials to start viewing live events in QAPilot.</p>
         </div>
@@ -2501,7 +2527,11 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         </div>
 
         <div class="platforms-section">
-          <div class="platforms-icon">&#127793;</div>
+          <div class="platforms-icons-row" aria-hidden="true">
+            <span class="platform-icon" title="Datadog"><img src="${escapeHtml(datadogSrc)}" alt="Datadog" /></span>
+            <span class="platform-icon" title="Sentry"><img src="${escapeHtml(sentrySrc)}" alt="Sentry" /></span>
+            <span class="platform-icon" title="Grafana"><img src="${escapeHtml(grafanaSrc)}" alt="Grafana" /></span>
+          </div>
           <p class="platforms-coming-soon">More platforms coming soon</p>
           <p class="platforms-sub">Datadog, Sentry, Grafana and others are on the way!</p>
           <a class="platform-request-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdabWeB6nQ2WAuYiLOmXKybHc1IQydhV5wUCvTDw7HCAaDrXw/viewform?usp=dialog" target="_blank">
@@ -2611,6 +2641,12 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
           font-size: 32px;
           margin-bottom: 12px;
         }
+        .setup-logo img {
+          width: 40px;
+          height: 40px;
+          display: block;
+          margin: 0 auto;
+        }
         .setup-header h1 {
           font-size: 18px;
           font-weight: 600;
@@ -2635,7 +2671,7 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
         }
         .step-dot.active {
           background: var(--vscode-button-background);
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         }
         .step-dot.done {
           background: #3fb950;

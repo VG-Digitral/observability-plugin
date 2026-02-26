@@ -124,12 +124,25 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private _showIntroView() {
     if (!this._view) { return; }
-    this._view.webview.html = getIntroHtml();
+    const logoUri = this._view.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'media', 'qapilot-logo.png')
+    ).toString();
+    this._view.webview.html = getIntroHtml({ posthogLogoUri: logoUri });
   }
 
   private _showSetupView(options?: SetupHtmlOptions) {
     if (!this._view) { return; }
-    this._view.webview.html = getSetupHtml(options);
+    const toUri = (file: string) =>
+      this._view!.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', file)).toString();
+    this._view.webview.html = getSetupHtml({
+      ...options,
+      posthogLogomarkUri: toUri('posthog-logomark.svg'),
+      platformIconUris: {
+        datadog: toUri('datadog.svg'),
+        sentry: toUri('sentry.svg'),
+        grafana: toUri('grafana.svg'),
+      },
+    });
   }
 
   private _showOpenAISetupView(options?: OpenAISetupHtmlOptions) {
