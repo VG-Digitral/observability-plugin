@@ -904,7 +904,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           right: 16px;
           width: 40px; height: 40px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: #2563eb;
           color: white;
           border: none;
           cursor: pointer;
@@ -912,15 +912,21 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           align-items: center;
           justify-content: center;
           font-size: 18px;
-          box-shadow: 0 3px 12px rgba(124, 58, 237, 0.4);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
           z-index: 999;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: background 0.15s;
         }
         .chat-fab:hover {
-          transform: scale(1.1);
-          box-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);
+          background: #1d4ed8;
         }
-        .chat-fab:active { transform: scale(0.95); }
+        .chat-fab:active {
+          background: #1e40af;
+        }
+        .chat-fab svg {
+          width: 22px;
+          height: 22px;
+          display: block;
+        }
 
         .btn-chat-logs {
           background: linear-gradient(135deg, #059669 0%, #10b981 100%);
@@ -1062,7 +1068,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
       </div>
 
       <!-- Floating chat button -->
-      <button class="chat-fab hidden" id="chat-fab" onclick="openNativeChat()" title="Chat with logs">&#128172;</button>
+      <button class="chat-fab hidden" id="chat-fab" onclick="openNativeChat()" title="Chat with logs"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
 
       <!-- Chat overlay -->
       <div class="chat-overlay" id="chat-overlay" onclick="closeNativeChat()"></div>
@@ -2221,7 +2227,16 @@ export function getIntroHtml(): string {
     </html>`;
 }
 
-export function getSetupHtml(): string {
+export interface SetupHtmlOptions {
+  prefilledApiKey?: string;
+  prefilledProjectId?: string;
+  showBackButton?: boolean;
+}
+
+export function getSetupHtml(options?: SetupHtmlOptions): string {
+  const apiKey = options?.prefilledApiKey ?? '';
+  const projectId = options?.prefilledProjectId ?? '';
+  const showBack = options?.showBackButton ?? false;
   return `<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -2333,6 +2348,27 @@ export function getSetupHtml(): string {
         .connect-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+        .setup-actions {
+          margin-top: 8px;
+        }
+        .setup-actions .connect-btn { width: 100%; }
+        .setup-top-bar {
+          margin-bottom: 20px;
+          text-align: left;
+        }
+        .back-btn {
+          padding: 0;
+          font-size: 12px;
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          background: none;
+          color: var(--vscode-textLink-foreground);
+          border: none;
+          cursor: pointer;
+          text-decoration: none;
+        }
+        .back-btn:hover {
+          text-decoration: underline;
         }
         .error-msg {
           background: rgba(248, 81, 73, 0.15);
@@ -2426,6 +2462,7 @@ export function getSetupHtml(): string {
     </head>
     <body>
       <div class="setup-container">
+        ${showBack ? '<div class="setup-top-bar"><button class="back-btn" id="back-btn" onclick="goBackToLogs()">← Back</button></div>' : ''}
         <div class="step-indicator">
           <div class="step-dot done"></div>
           <div class="step-dot active"></div>
@@ -2440,17 +2477,19 @@ export function getSetupHtml(): string {
 
         <div class="form-group">
           <label for="api-key">Personal API Key</label>
-          <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" />
+          <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" value="${escapeHtml(apiKey)}" />
           <div class="hint">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</div>
         </div>
 
         <div class="form-group">
           <label for="project-id">Project ID</label>
-          <input type="text" id="project-id" placeholder="e.g. 12345" autocomplete="off" />
+          <input type="text" id="project-id" placeholder="e.g. 12345" autocomplete="off" value="${escapeHtml(projectId)}" />
           <div class="hint">Find this in PostHog &rarr; Settings &rarr; Project &rarr; Project ID</div>
         </div>
 
-        <button class="connect-btn" id="connect-btn" onclick="handleConnect()">Connect</button>
+        <div class="setup-actions">
+          <button class="connect-btn" id="connect-btn" onclick="handleConnect()">${showBack ? 'Update' : 'Connect'}</button>
+        </div>
 
         <div class="error-msg" id="error-msg"></div>
         <div class="success-msg" id="success-msg"></div>
@@ -2505,6 +2544,10 @@ export function getSetupHtml(): string {
           });
         }
 
+        function goBackToLogs() {
+          vscode.postMessage({ type: 'goBackToLogs' });
+        }
+
         window.addEventListener('message', function(event) {
           const msg = event.data;
           const errorEl = document.getElementById('error-msg');
@@ -2521,7 +2564,7 @@ export function getSetupHtml(): string {
               errorEl.style.display = 'block';
               successEl.style.display = 'none';
               btn.disabled = false;
-              btn.textContent = 'Connect';
+              btn.textContent = document.getElementById('back-btn') ? 'Update' : 'Connect';
             }
           }
         });
@@ -2530,7 +2573,14 @@ export function getSetupHtml(): string {
     </html>`;
 }
 
-export function getOpenAISetupHtml(): string {
+export interface OpenAISetupHtmlOptions {
+  prefilledOpenAIKey?: string;
+  showBackButton?: boolean;
+}
+
+export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
+  const openaiKey = options?.prefilledOpenAIKey ?? '';
+  const showBack = options?.showBackButton ?? false;
   return `<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -2643,6 +2693,27 @@ export function getOpenAISetupHtml(): string {
           opacity: 0.6;
           cursor: not-allowed;
         }
+        .setup-actions {
+          margin-top: 8px;
+        }
+        .setup-actions .connect-btn { width: 100%; }
+        .setup-top-bar {
+          margin-bottom: 20px;
+          text-align: left;
+        }
+        .back-btn {
+          padding: 0;
+          font-size: 12px;
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          background: none;
+          color: var(--vscode-textLink-foreground);
+          border: none;
+          cursor: pointer;
+          text-decoration: none;
+        }
+        .back-btn:hover {
+          text-decoration: underline;
+        }
         .error-msg {
           background: rgba(248, 81, 73, 0.15);
           border: 1px solid rgba(248, 81, 73, 0.4);
@@ -2682,6 +2753,7 @@ export function getOpenAISetupHtml(): string {
     </head>
     <body>
       <div class="setup-container">
+        ${showBack ? '<div class="setup-top-bar"><button class="back-btn" id="back-btn" onclick="goBackToLogs()">← Back</button></div>' : ''}
         <div class="step-indicator">
           <div class="step-dot done"></div>
           <div class="step-dot done"></div>
@@ -2696,11 +2768,13 @@ export function getOpenAISetupHtml(): string {
 
         <div class="form-group">
           <label for="openai-key">OpenAI API Key</label>
-          <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" />
+          <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" value="${escapeHtml(openaiKey)}" />
           <div class="hint">Find this at <strong>platform.openai.com</strong> &rarr; API Keys</div>
         </div>
 
-        <button class="connect-btn" id="save-btn" onclick="handleSave()">Save &amp; Continue</button>
+        <div class="setup-actions">
+          <button class="connect-btn" id="save-btn" onclick="handleSave()">${showBack ? 'Update' : 'Save &amp; Continue'}</button>
+        </div>
 
         <div class="error-msg" id="error-msg"></div>
         <div class="success-msg" id="success-msg"></div>
@@ -2745,6 +2819,10 @@ export function getOpenAISetupHtml(): string {
           });
         }
 
+        function goBackToLogs() {
+          vscode.postMessage({ type: 'goBackToLogs' });
+        }
+
         window.addEventListener('message', function(event) {
           const msg = event.data;
           const errorEl = document.getElementById('error-msg');
@@ -2761,7 +2839,7 @@ export function getOpenAISetupHtml(): string {
               errorEl.style.display = 'block';
               successEl.style.display = 'none';
               btn.disabled = false;
-              btn.textContent = 'Save & Continue';
+              btn.textContent = document.getElementById('back-btn') ? 'Update' : 'Save & Continue';
             }
           }
         });

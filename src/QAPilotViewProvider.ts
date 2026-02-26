@@ -7,7 +7,7 @@ import { POLL_INTERVAL_MS, MAX_LOGS, VISIBILITY_DELAY_S } from './constants.js';
 import { log } from './logger.js';
 import { callApi } from './api.js';
 import { parseRow, formatTimestamp } from './logParser.js';
-import { getWebviewHtml, getIntroHtml, getSetupHtml, getOpenAISetupHtml } from './webviewHtml.js';
+import { getWebviewHtml, getIntroHtml, getSetupHtml, getOpenAISetupHtml, type SetupHtmlOptions, type OpenAISetupHtmlOptions } from './webviewHtml.js';
 import type * as ConversationStore from './conversationStore.js';
 import { CredentialManager, type PostHogCredentials } from './credentialManager.js';
 
@@ -110,6 +110,9 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'resetOpenAIKey':
           this._handleResetOpenAIKey();
           break;
+        case 'goBackToLogs':
+          this._handleGoBackToLogs();
+          break;
         case 'disconnect':
           this._handleDisconnect();
           break;
@@ -124,14 +127,14 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     this._view.webview.html = getIntroHtml();
   }
 
-  private _showSetupView() {
+  private _showSetupView(options?: SetupHtmlOptions) {
     if (!this._view) { return; }
-    this._view.webview.html = getSetupHtml();
+    this._view.webview.html = getSetupHtml(options);
   }
 
-  private _showOpenAISetupView() {
+  private _showOpenAISetupView(options?: OpenAISetupHtmlOptions) {
     if (!this._view) { return; }
-    this._view.webview.html = getOpenAISetupHtml();
+    this._view.webview.html = getOpenAISetupHtml(options);
   }
 
   private _showLogsView() {
@@ -200,21 +203,29 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleResetPostHogKey() {
     this.stopPolling();
-    await this._credentialManager.clearPostHog();
-    this._credentials = null;
-    this._logs = [];
-    this._seenUuids.clear();
-    this._lastCreatedAt = null;
-    this._showSetupView();
-    log('PostHog credentials cleared — showing setup');
+    const creds = await this._credentialManager.get();
+    this._showSetupView({
+      prefilledApiKey: creds?.apiKey,
+      prefilledProjectId: creds?.projectId,
+      showBackButton: true
+    });
+    log('Showing PostHog setup to change key');
   }
 
   private async _handleResetOpenAIKey() {
     this.stopPolling();
-    await this._credentialManager.clearOpenAIKey();
-    this._openaiKey = null;
-    this._showOpenAISetupView();
-    log('OpenAI key cleared — showing setup');
+    const openaiKey = await this._credentialManager.getOpenAIKey();
+    this._showOpenAISetupView({
+      prefilledOpenAIKey: openaiKey ?? undefined,
+      showBackButton: true
+    });
+    log('Showing OpenAI setup to change key');
+  }
+
+  private _handleGoBackToLogs() {
+    this._showLogsView();
+    this.startPolling();
+    log('Returned to logs view');
   }
 
   private async _handleDisconnect() {
@@ -227,6 +238,11 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     this._lastCreatedAt = null;
     this._showIntroView();
     log('Disconnected — credentials cleared');
+  }
+
+  /** Clears all credentials and shows the welcome screen (for testing or starting over). */
+  public async resetToWelcome(): Promise<void> {
+    await this._handleDisconnect();
   }
 
   public async hasCredentials(): Promise<boolean> {

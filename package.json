@@ -20,6 +20,11 @@
         "category": "QAPilot"
       },
       {
+        "command": "qapilot.resetToWelcome",
+        "title": "Reset to Welcome Screen",
+        "category": "QAPilot"
+      },
+      {
         "command": "qapilot.refreshLogs",
         "title": "Refresh Logs",
         "icon": "$(refresh)",

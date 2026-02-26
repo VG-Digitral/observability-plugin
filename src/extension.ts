@@ -61,6 +61,12 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.executeCommand('qapilot.logsView.focus');
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('qapilot.resetToWelcome', async () => {
+      await provider.resetToWelcome();
+    })
+  );
 }
 
 export function deactivate() {
