@@ -68,6 +68,15 @@ export function parseRow(row: unknown[], fieldMapping?: FieldMapping | null): Lo
   const rawPersonId = fieldMapping?.personId != null ? getProp(properties, fieldMapping.personId) : undefined;
   const personId = String(rawPersonId ?? /* properties.person_id ?? */ rawDistinctId ?? '');
 
+  const rawPosthogEvent = {
+    uuid: row[0],
+    event: row[1],
+    timestamp: row[2],
+    created_at: row[3],
+    distinct_id: row[4],
+    properties: row[5]
+  };
+
   return {
     uuid: String(rawUuid || ''),
     event,
@@ -78,6 +87,61 @@ export function parseRow(row: unknown[], fieldMapping?: FieldMapping | null): Lo
     logMessage,
     personId,
     properties,
-    receivedAt: Date.now()
+    receivedAt: Date.now(),
+    rawPosthogEvent
+  };
+}
+
+/** Raw PostHog event shape we store on LogEntry for "Show raw JSON" and re-parsing. */
+interface RawPosthogEventShape {
+  uuid: unknown;
+  event: unknown;
+  timestamp: unknown;
+  created_at: unknown;
+  distinct_id: unknown;
+  properties: unknown;
+}
+
+function isRawPosthogEventShape(v: unknown): v is RawPosthogEventShape {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    'uuid' in v &&
+    'event' in v &&
+    'timestamp' in v &&
+    'created_at' in v &&
+    'distinct_id' in v &&
+    'properties' in v
+  );
+}
+
+/**
+ * Re-parses an existing LogEntry with a new field mapping (e.g. after schema refresh).
+ * Uses rawPosthogEvent to rebuild the row and parse with the new mapping.
+ * Preserves insight-related and other UI-only fields from the original entry.
+ */
+export function reparseLogEntry(
+  entry: LogEntry,
+  fieldMapping: FieldMapping | null
+): LogEntry {
+  if (!isRawPosthogEventShape(entry.rawPosthogEvent)) {
+    return entry;
+  }
+  const raw = entry.rawPosthogEvent;
+  const row: unknown[] = [raw.uuid, raw.event, raw.timestamp, raw.created_at, raw.distinct_id, raw.properties];
+  const reparsed = parseRow(row, fieldMapping);
+  if (!reparsed) return entry;
+  return {
+    ...reparsed,
+    receivedAt: entry.receivedAt ?? reparsed.receivedAt,
+    isInsight: entry.isInsight,
+    insightCategory: entry.insightCategory,
+    insightColor: entry.insightColor,
+    insightType: entry.insightType,
+    insightIconUrl: entry.insightIconUrl,
+    level2Markdown: entry.level2Markdown,
+    sourceLogIds: entry.sourceLogIds,
+    windowStart: entry.windowStart,
+    windowEnd: entry.windowEnd
   };
 }

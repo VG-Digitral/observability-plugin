@@ -27,7 +27,7 @@ function stringifySample(v: unknown): string {
  * plus 2-3 sample values per key for LLM context.
  */
 export async function discoverSchema(credentials: PostHogCredentials): Promise<SchemaInfo | null> {
-  const query = `SELECT properties FROM events ORDER BY created_at DESC LIMIT 5`;
+  const query = `SELECT properties FROM events ORDER BY created_at DESC LIMIT 20`;
   try {
     const response = await callApi('hogql_query', { query }, credentials);
     const results = (response?.data?.results as unknown[][] | undefined) ?? [];
@@ -133,7 +133,7 @@ Return the mapping JSON only.`;
         Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

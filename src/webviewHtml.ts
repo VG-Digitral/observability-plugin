@@ -363,6 +363,40 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           font-family: var(--vscode-editor-font-family), monospace;
         }
 
+        .raw-json-wrap { padding: 8px 12px; border-top: 1px solid var(--vscode-panel-border); }
+        .raw-json-toggle {
+          background: none;
+          border: none;
+          color: var(--vscode-textLink-foreground);
+          font-size: 11px;
+          cursor: pointer;
+          padding: 4px 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--vscode-font-family);
+        }
+        .raw-json-toggle:hover { text-decoration: underline; }
+        .raw-json-panel {
+          display: none;
+          margin-top: 8px;
+          max-height: 280px;
+          overflow: auto;
+          background: var(--vscode-textCodeBlock-background);
+          border-radius: 4px;
+          padding: 10px;
+          border: 1px solid var(--vscode-panel-border);
+        }
+        .raw-json-panel.expanded { display: block; }
+        .raw-json-pre {
+          margin: 0;
+          font-size: 11px;
+          font-family: var(--vscode-editor-font-family), monospace;
+          white-space: pre-wrap;
+          word-break: break-word;
+          color: var(--vscode-foreground);
+        }
+
         .empty-state {
           text-align: center;
           padding: 60px 20px;
@@ -1573,6 +1607,33 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           }
         }
 
+        function toggleRawJson(index) {
+          var log = displayedLogs[index];
+          if (!log || log.rawPosthogEvent == null) return;
+          var panel = document.getElementById('raw-json-panel-' + index);
+          var card = panel ? panel.closest('.log-card') : null;
+          var label = card ? card.querySelector('.raw-json-label') : null;
+          if (!panel) return;
+          if (panel.classList.contains('expanded')) {
+            panel.classList.remove('expanded');
+            panel.innerHTML = '';
+            panel.setAttribute('aria-hidden', 'true');
+            if (label) label.textContent = '\\u25BC Raw JSON';
+          } else {
+            try {
+              var jsonStr = JSON.stringify(log.rawPosthogEvent, null, 2);
+              panel.innerHTML = '<pre class="raw-json-pre">' + escapeHtml(jsonStr) + '</pre>';
+              panel.classList.add('expanded');
+              panel.setAttribute('aria-hidden', 'false');
+              if (label) label.textContent = '\\u25B2 Raw JSON';
+            } catch (e) {
+              panel.innerHTML = '<pre class="raw-json-pre">' + escapeHtml(String(e)) + '</pre>';
+              panel.classList.add('expanded');
+              if (label) label.textContent = '\\u25B2 Raw JSON';
+            }
+          }
+        }
+
         function goDeeper(index) {
           var insight = displayedLogs[index];
           if (!insight || !insight.isInsight) return;
@@ -1672,6 +1733,16 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             '</div>';
           }
 
+          var rawJsonBlock = '';
+          if (log.rawPosthogEvent != null) {
+            rawJsonBlock =
+              '<div class="raw-json-wrap">' +
+                '<button type="button" class="raw-json-toggle" onclick="event.stopPropagation(); toggleRawJson(' + index + ')" title="Show full PostHog response">' +
+                  '<span class="raw-json-label">\\u25BC Raw JSON</span>' +
+                '</button>' +
+                '<div class="raw-json-panel" id="raw-json-panel-' + index + '" aria-hidden="true"></div>' +
+              '</div>';
+          }
           return '<div class="log-card ' + selectedClass + '" data-index="' + index + '" onclick="handleLogClick(event, ' + index + ')">' +
             '<div class="log-header">' +
               '<div class="log-checkbox ' + checkedClass + '"></div>' +
@@ -1697,6 +1768,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 '<span class="log-meta-value">' + escapeHtml(log.personId || '') + '</span>' +
               '</div>' +
             '</div>' +
+            rawJsonBlock +
           '</div>';
         }
 

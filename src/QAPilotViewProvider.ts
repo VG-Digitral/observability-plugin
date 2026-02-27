@@ -6,7 +6,7 @@ import { LogEntry, PollingStatus } from './types.js';
 import { POLL_INTERVAL_MS, MAX_LOGS, VISIBILITY_DELAY_S } from './constants.js';
 import { log } from './logger.js';
 import { callApi } from './api.js';
-import { parseRow, formatTimestamp } from './logParser.js';
+import { parseRow, formatTimestamp, reparseLogEntry } from './logParser.js';
 import { getWebviewHtml, getIntroHtml, getSetupHtml, getOpenAISetupHtml, getAnalyzingSchemaHtml, type SetupHtmlOptions, type OpenAISetupHtmlOptions } from './webviewHtml.js';
 import type * as ConversationStore from './conversationStore.js';
 import { CredentialManager, type PostHogCredentials, type FieldMapping } from './credentialManager.js';
@@ -289,8 +289,13 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     await this._runSchemaMappingFlow();
+    // Re-parse all existing logs with the new mapping so they render with the updated schema
+    if (this._fieldMapping && this._logs.length > 0) {
+      this._logs = this._logs.map((entry) => reparseLogEntry(entry, this._fieldMapping));
+      log(`Re-parsed ${this._logs.length} existing log(s) with new schema mapping`);
+    }
     this._showLogsView();
-    void vscode.window.showInformationMessage('Schema mapping refreshed. New logs will use the updated mapping.');
+    void vscode.window.showInformationMessage('Schema mapping refreshed. All logs now use the updated mapping.');
     log('Schema mapping refreshed by user');
   }
 
