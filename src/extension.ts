@@ -27,7 +27,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const hasCreds = await provider.hasCredentials();
   if (hasCreds) {
-    provider.startPolling();
+    void provider.startPolling();
   } else {
     log('No PostHog credentials configured — waiting for setup');
   }

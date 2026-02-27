@@ -321,7 +321,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     return d.toISOString().replace('T', ' ').substring(0, 19);
   }
 
-  public startPolling() {
+  public async startPolling() {
     if (!this._credentials) {
       log('Cannot start polling — no credentials configured');
       return;
@@ -329,6 +329,23 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     if (this._pollTimer) {
       log('Polling already active');
       return;
+    }
+
+    if (!this._openaiKey) {
+      this._openaiKey = await this._credentialManager.getOpenAIKey();
+    }
+
+    if (!this._fieldMapping) {
+      this._fieldMapping = await this._credentialManager.getFieldMapping(this._credentials.projectId);
+      log(`Loaded field mapping from storage: ${this._fieldMapping ? JSON.stringify(this._fieldMapping) : 'NULL'}`);
+    } else {
+      log(`Field mapping already in memory: ${JSON.stringify(this._fieldMapping)}`);
+    }
+
+    if (!this._fieldMapping && this._openaiKey) {
+      log('No stored field mapping found — running schema mapping before first poll');
+      await this._runSchemaMappingFlow();
+      this._showLogsView();
     }
 
     this._pollingStatus = 'starting';
@@ -574,6 +591,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     }
 
     log(`Got ${results.length} event(s) after ${this._lastCreatedAt}`);
+    log(`Field mapping in use: ${this._fieldMapping ? JSON.stringify(this._fieldMapping) : 'NULL'}`);
     const rows = results;
 
     let newCount = 0;
