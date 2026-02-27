@@ -1,13 +1,27 @@
 import { LogEntry } from './types.js';
+import type { FieldMapping } from './schemaMapper.js';
 
 export function formatTimestamp(ts: string): string {
   if (!ts) { return ''; }
   return ts.replace('T', ' ').substring(0, 19);
 }
 
-export function extractMessage(event: string, properties: Record<string, unknown>): string {
-  if (properties.log_message) { return String(properties.log_message); }
-  if (properties.message) { return String(properties.message); }
+function getProp(properties: Record<string, unknown>, key: string | null): unknown {
+  if (!key || !(key in properties)) return undefined;
+  return properties[key];
+}
+
+export function extractMessage(
+  event: string,
+  properties: Record<string, unknown>,
+  mapping?: { logMessage: string | null } | null
+): string {
+  if (mapping?.logMessage && properties[mapping.logMessage] != null) {
+    return String(properties[mapping.logMessage]);
+  }
+  // Hardcoded fallbacks commented out to verify LLM schema matching
+  // if (properties.log_message) { return String(properties.log_message); }
+  // if (properties.message) { return String(properties.message); }
 
   const skipKeys = new Set([
     'log_level', 'log_tag', 'level', 'tag', 'source', 'person_id',
@@ -32,7 +46,7 @@ export function extractMessage(event: string, properties: Record<string, unknown
   return relevant || event;
 }
 
-export function parseRow(row: unknown[]): LogEntry | null {
+export function parseRow(row: unknown[], fieldMapping?: FieldMapping | null): LogEntry | null {
   if (!row || row.length < 5) { return null; }
   const [rawUuid, rawEvent, rawTimestamp, /* created_at */, rawDistinctId, rawProps] = row;
 
@@ -44,9 +58,15 @@ export function parseRow(row: unknown[]): LogEntry | null {
   }
 
   const event = String(rawEvent || '');
-  const logLevel = String(properties.log_level || properties.level || 'INFO').toUpperCase();
-  const logTag = String(properties.log_tag || properties.tag || properties.source || '');
-  const logMessage = extractMessage(event, properties);
+  const rawLevel = fieldMapping?.logLevel != null ? getProp(properties, fieldMapping.logLevel) : undefined;
+  const logLevel = String(
+    rawLevel ?? /* properties.log_level ?? properties.level ?? */ 'INFO'
+  ).toUpperCase();
+  const rawTag = fieldMapping?.logTag != null ? getProp(properties, fieldMapping.logTag) : undefined;
+  const logTag = String(rawTag ?? /* properties.log_tag ?? properties.tag ?? properties.source ?? */ '');
+  const logMessage = extractMessage(event, properties, fieldMapping ?? undefined);
+  const rawPersonId = fieldMapping?.personId != null ? getProp(properties, fieldMapping.personId) : undefined;
+  const personId = String(rawPersonId ?? /* properties.person_id ?? */ rawDistinctId ?? '');
 
   return {
     uuid: String(rawUuid || ''),
@@ -56,7 +76,7 @@ export function parseRow(row: unknown[]): LogEntry | null {
     logLevel,
     logTag,
     logMessage,
-    personId: String(properties.person_id || rawDistinctId || ''),
+    personId,
     properties,
     receivedAt: Date.now()
   };

@@ -2883,3 +2883,54 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
     </body>
     </html>`;
 }
+
+export function getAnalyzingSchemaHtml(): string {
+  return `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: var(--vscode-font-family), system-ui, sans-serif;
+          font-size: 13px;
+          color: var(--vscode-foreground);
+          background: var(--vscode-panel-background);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 24px;
+        }
+        .analyzing-container {
+          text-align: center;
+          max-width: 320px;
+        }
+        .spinner {
+          width: 32px;
+          height: 32px;
+          margin: 0 auto 16px;
+          border: 3px solid var(--vscode-panel-border);
+          border-top-color: var(--vscode-button-background);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .analyzing-container p {
+          color: var(--vscode-descriptionForeground);
+          line-height: 1.5;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="analyzing-container">
+        <div class="spinner"></div>
+        <p>Analyzing your event schema...</p>
+        <p style="margin-top: 8px; font-size: 12px;">Mapping PostHog properties to the log viewer.</p>
+      </div>
+    </body>
+    </html>`;
+}

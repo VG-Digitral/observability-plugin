@@ -1,13 +1,20 @@
 import * as vscode from 'vscode';
+import type { FieldMapping } from './schemaMapper.js';
 
 export interface PostHogCredentials {
   apiKey: string;
   projectId: string;
 }
 
+export type { FieldMapping };
+
 const KEY_API_KEY = 'qapilot.posthog.apiKey';
 const KEY_PROJECT_ID = 'qapilot.posthog.projectId';
 const KEY_OPENAI_KEY = 'qapilot.openai.apiKey';
+
+function fieldMappingKey(projectId: string): string {
+  return `qapilot.fieldMapping.${projectId}`;
+}
 
 export class CredentialManager {
   constructor(private readonly _secrets: vscode.SecretStorage) {}
@@ -46,5 +53,28 @@ export class CredentialManager {
     await this._secrets.delete(KEY_API_KEY);
     await this._secrets.delete(KEY_PROJECT_ID);
     await this._secrets.delete(KEY_OPENAI_KEY);
+  }
+
+  async storeFieldMapping(projectId: string, mapping: FieldMapping): Promise<void> {
+    await this._secrets.store(fieldMappingKey(projectId), JSON.stringify(mapping));
+  }
+
+  async getFieldMapping(projectId: string): Promise<FieldMapping | null> {
+    const raw = await this._secrets.get(fieldMappingKey(projectId));
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as FieldMapping;
+      const valid = (x: unknown): x is string | null => x === null || typeof x === 'string';
+      if (!valid(parsed.logLevel) || !valid(parsed.logTag) || !valid(parsed.logMessage) || !valid(parsed.personId)) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  async clearFieldMapping(projectId: string): Promise<void> {
+    await this._secrets.delete(fieldMappingKey(projectId));
   }
 }

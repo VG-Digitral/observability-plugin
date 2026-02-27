@@ -7,9 +7,10 @@ import { POLL_INTERVAL_MS, MAX_LOGS, VISIBILITY_DELAY_S } from './constants.js';
 import { log } from './logger.js';
 import { callApi } from './api.js';
 import { parseRow, formatTimestamp } from './logParser.js';
-import { getWebviewHtml, getIntroHtml, getSetupHtml, getOpenAISetupHtml, type SetupHtmlOptions, type OpenAISetupHtmlOptions } from './webviewHtml.js';
+import { getWebviewHtml, getIntroHtml, getSetupHtml, getOpenAISetupHtml, getAnalyzingSchemaHtml, type SetupHtmlOptions, type OpenAISetupHtmlOptions } from './webviewHtml.js';
 import type * as ConversationStore from './conversationStore.js';
-import { CredentialManager, type PostHogCredentials } from './credentialManager.js';
+import { CredentialManager, type PostHogCredentials, type FieldMapping } from './credentialManager.js';
+import { discoverSchema, generateFieldMapping } from './schemaMapper.js';
 
 export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'qapilot.logsView';
@@ -33,6 +34,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
   private _knownInsightCategories: Set<string> = new Set();
   private _credentials: PostHogCredentials | null = null;
   private _openaiKey: string | null = null;
+  private _fieldMapping: FieldMapping | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -54,6 +56,9 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
     this._credentials = await this._credentialManager.get();
     this._openaiKey = await this._credentialManager.getOpenAIKey();
+    if (this._credentials) {
+      this._fieldMapping = await this._credentialManager.getFieldMapping(this._credentials.projectId);
+    }
 
     if (this._credentials && this._openaiKey) {
       this._showLogsView();
@@ -159,6 +164,44 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private _showAnalyzingSchemaView() {
+    if (!this._view) { return; }
+    this._view.webview.html = getAnalyzingSchemaHtml();
+  }
+
+  /** Fetches sample events, asks LLM for field mapping, stores it. Uses null mapping on any failure. */
+  private async _runSchemaMappingFlow(): Promise<void> {
+    if (!this._credentials || !this._openaiKey) {
+      this._fieldMapping = null;
+      return;
+    }
+    this._showAnalyzingSchemaView();
+    try {
+      let schemaInfo: Awaited<ReturnType<typeof discoverSchema>> = null;
+      try {
+        schemaInfo = await discoverSchema(this._credentials);
+      } catch (err) {
+        log(`Schema discovery failed, using fallback mapping: ${err instanceof Error ? err.message : String(err)}`);
+        this._fieldMapping = null;
+        return;
+      }
+      const mapping = await generateFieldMapping(schemaInfo, this._openaiKey);
+      if (mapping) {
+        await this._credentialManager.storeFieldMapping(this._credentials.projectId, mapping);
+        this._fieldMapping = mapping;
+      } else {
+        this._fieldMapping = null;
+        log('Field mapping not generated (empty schema or OpenAI failure), using fallback');
+        void vscode.window.showWarningMessage(
+          'QAPilot could not generate a custom field mapping. Using default property names (log_message, level, etc.). If your events use different property keys, logs may not display correctly.'
+        );
+      }
+    } catch (err) {
+      log(`Schema mapping flow error: ${err instanceof Error ? err.message : String(err)}`);
+      this._fieldMapping = null;
+    }
+  }
+
   private async _handleSaveCredentials(apiKey: string, projectId: string) {
     try {
       const testCreds: PostHogCredentials = { apiKey, projectId };
@@ -176,6 +219,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       const existingOpenAIKey = await this._credentialManager.getOpenAIKey();
       if (existingOpenAIKey) {
         this._openaiKey = existingOpenAIKey;
+        await this._runSchemaMappingFlow();
         this._showLogsView();
         this.startPolling();
       } else {
@@ -201,6 +245,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       log('OpenAI API key saved successfully');
 
       await new Promise(resolve => setTimeout(resolve, 800));
+      await this._runSchemaMappingFlow();
       this._showLogsView();
       this.startPolling();
     } catch (err) {
@@ -243,9 +288,14 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleDisconnect() {
     this.stopPolling();
+    const projectId = this._credentials?.projectId;
+    if (projectId) {
+      await this._credentialManager.clearFieldMapping(projectId);
+    }
     await this._credentialManager.clear();
     this._credentials = null;
     this._openaiKey = null;
+    this._fieldMapping = null;
     this._logs = [];
     this._seenUuids.clear();
     this._lastCreatedAt = null;
@@ -528,7 +578,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
     let newCount = 0;
     for (const row of rows) {
-      const entry = parseRow(row);
+      const entry = parseRow(row, this._fieldMapping);
       if (!entry || !entry.uuid) { continue; }
       if (this._seenUuids.has(entry.uuid)) { continue; }
 
