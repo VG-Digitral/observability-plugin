@@ -115,6 +115,9 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         case 'resetOpenAIKey':
           this._handleResetOpenAIKey();
           break;
+        case 'refreshSchema':
+          this._handleRefreshSchema();
+          break;
         case 'goBackToLogs':
           this._handleGoBackToLogs();
           break;
@@ -278,6 +281,17 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       showBackButton: true
     });
     log('Showing OpenAI setup to change key');
+  }
+
+  private async _handleRefreshSchema() {
+    if (!this._credentials || !this._openaiKey) {
+      void vscode.window.showWarningMessage('PostHog and OpenAI keys are required to refresh schema.');
+      return;
+    }
+    await this._runSchemaMappingFlow();
+    this._showLogsView();
+    void vscode.window.showInformationMessage('Schema mapping refreshed. New logs will use the updated mapping.');
+    log('Schema mapping refreshed by user');
   }
 
   private _handleGoBackToLogs() {

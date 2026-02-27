@@ -1010,6 +1010,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           <div class="settings-dropdown hidden" id="settings-dropdown">
             <button type="button" onclick="changePostHogKey()">Change PostHog Key</button>
             <button type="button" onclick="changeOpenAIKey()">Change OpenAI Key</button>
+            <button type="button" onclick="refreshSchema()">Refresh schema</button>
           </div>
         </div>
       </div>
@@ -1141,6 +1142,11 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         function changeOpenAIKey() {
           closeSettingsDropdown();
           vscode.postMessage({ type: 'resetOpenAIKey' });
+        }
+
+        function refreshSchema() {
+          closeSettingsDropdown();
+          vscode.postMessage({ type: 'refreshSchema' });
         }
 
         document.addEventListener('click', function() {
