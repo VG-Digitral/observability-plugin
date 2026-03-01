@@ -81,14 +81,14 @@ export async function discoverSchema(credentials: PostHogCredentials): Promise<S
 
 export interface FieldMapping {
   logLevel: string | null;
-  logTag: string | null;
+  logEventType: string | null;
   logMessage: string | null;
   personId: string | null;
 }
 
 const UI_FIELD_DESCRIPTIONS = `
 - logLevel: severity or level of the log (e.g. INFO, ERROR, WARN, DEBUG). Prefer short categorical values.
-- logTag: source, service name, or tag that identifies where the log came from (e.g. service name, component).
+- logEventType: source, service name, or tag that identifies where the log came from (e.g. service name, component).
 - logMessage: the main human-readable message or description of the event (e.g. error message, action description). Prefer the most descriptive text field.
 - personId: identifier for the user or person (e.g. user_id, anonymous_id). Use null if no such property exists.
 `.trim();
@@ -118,7 +118,7 @@ export async function generateFieldMapping(
 Our UI fields and what they represent:
 ${UI_FIELD_DESCRIPTIONS}
 
-Respond ONLY with a valid JSON object with exactly these keys: logLevel, logTag, logMessage, personId. Each value must be either a string (one of the given property keys) or null. No explanation, no markdown.`;
+Respond ONLY with a valid JSON object with exactly these keys: logLevel, logEventType, logMessage, personId. Each value must be either a string (one of the given property keys) or null. No explanation, no markdown.`;
 
   const userPrompt = `Here are the property keys from the user's PostHog events:
 ${keysWithSamples}
@@ -166,12 +166,12 @@ Return the mapping JSON only.`;
 
     const mapping: FieldMapping = {
       logLevel: typeof parsed.logLevel === 'string' ? parsed.logLevel : null,
-      logTag: typeof parsed.logTag === 'string' ? parsed.logTag : null,
+      logEventType: typeof parsed.logEventType === 'string' ? parsed.logEventType : null,
       logMessage: typeof parsed.logMessage === 'string' ? parsed.logMessage : null,
       personId: typeof parsed.personId === 'string' ? parsed.personId : null,
     };
 
-    log(`Field mapping generated: logLevel=${mapping.logLevel ?? 'null'} logTag=${mapping.logTag ?? 'null'} logMessage=${mapping.logMessage ?? 'null'} personId=${mapping.personId ?? 'null'}`);
+    log(`Field mapping generated: logLevel=${mapping.logLevel ?? 'null'} logEventType=${mapping.logEventType ?? 'null'} logMessage=${mapping.logMessage ?? 'null'} personId=${mapping.personId ?? 'null'}`);
     return mapping;
   } catch (err) {
     log(`OpenAI mapping error: ${err instanceof Error ? err.message : String(err)}`);

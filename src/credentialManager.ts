@@ -65,7 +65,7 @@ export class CredentialManager {
     try {
       const parsed = JSON.parse(raw) as FieldMapping;
       const valid = (x: unknown): x is string | null => x === null || typeof x === 'string';
-      if (!valid(parsed.logLevel) || !valid(parsed.logTag) || !valid(parsed.logMessage) || !valid(parsed.personId)) {
+      if (!valid(parsed.logLevel) || !valid(parsed.logEventType) || !valid(parsed.logMessage) || !valid(parsed.personId)) {
         return null;
       }
       return parsed;

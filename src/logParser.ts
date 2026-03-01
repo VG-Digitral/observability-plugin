@@ -62,8 +62,8 @@ export function parseRow(row: unknown[], fieldMapping?: FieldMapping | null): Lo
   const logLevel = String(
     rawLevel ?? /* properties.log_level ?? properties.level ?? */ 'INFO'
   ).toUpperCase();
-  const rawTag = fieldMapping?.logTag != null ? getProp(properties, fieldMapping.logTag) : undefined;
-  const logTag = String(rawTag ?? /* properties.log_tag ?? properties.tag ?? properties.source ?? */ '');
+  const rawTag = fieldMapping?.logEventType != null ? getProp(properties, fieldMapping.logEventType) : undefined;
+  const logEventType = String(rawTag ?? /* properties.log_tag ?? properties.tag ?? properties.source ?? */ '');
   const logMessage = extractMessage(event, properties, fieldMapping ?? undefined);
   const rawPersonId = fieldMapping?.personId != null ? getProp(properties, fieldMapping.personId) : undefined;
   const personId = String(rawPersonId ?? /* properties.person_id ?? */ rawDistinctId ?? '');
@@ -83,7 +83,7 @@ export function parseRow(row: unknown[], fieldMapping?: FieldMapping | null): Lo
     timestamp: formatTimestamp(String(rawTimestamp || '')),
     distinctId: String(rawDistinctId || ''),
     logLevel,
-    logTag,
+    logEventType,
     logMessage,
     personId,
     properties,

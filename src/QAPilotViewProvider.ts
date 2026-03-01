@@ -528,7 +528,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
           timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
           distinctId: 'llm-analyzer',
           logLevel: category,
-          logTag: 'AI',
+          logEventType: 'AI',
           logMessage: insight.level1,
           personId: '',
           properties: {},
@@ -726,7 +726,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       } else {
         path = '/deep_insight';
         const formattedLogs = logs.map(l =>
-          `[${l.logLevel}] ${l.timestamp} [${l.logTag}] ${l.logMessage}`
+          `[${l.logLevel}] ${l.timestamp} [${l.logEventType}] ${l.logMessage}`
         ).join('\n');
         body = JSON.stringify({
           logs_text: formattedLogs,
@@ -842,7 +842,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     }
 
     const formattedLogs = logs
-      .map(l => `[${l.logLevel}] ${l.timestamp} [${l.logTag}] ${l.logMessage}`)
+      .map(l => `[${l.logLevel}] ${l.timestamp} [${l.logEventType}] ${l.logMessage}`)
       .join('\n');
 
     const prompt = `I found the following logs in my PostHog data. Can you help me identify and fix any issues?\n\n\`\`\`\n${formattedLogs}\n\`\`\``;

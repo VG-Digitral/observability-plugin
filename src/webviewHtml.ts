@@ -327,7 +327,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         .log-level.error { background: rgba(241, 76, 76, 0.2); color: #f14c4c; }
         .log-level.critical { background: rgba(200, 20, 20, 0.3); color: #ff4444; }
         .log-timestamp { color: var(--vscode-descriptionForeground); font-size: 11px; }
-        .log-tag { color: var(--vscode-textLink-foreground); font-weight: 600; }
+        .log-event-type { color: var(--vscode-textLink-foreground); font-weight: 600; }
         .log-event {
           color: var(--vscode-symbolIcon-functionForeground, #b180d7);
           margin-left: auto;
@@ -1466,7 +1466,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 const eventResult = fuzzyMatch(searchQuery, log.event || '');
                 const uuidResult = fuzzyMatch(searchQuery, log.uuid || '');
                 const distinctIdResult = fuzzyMatch(searchQuery, log.distinctId || '');
-                const tagResult = fuzzyMatch(searchQuery, log.logTag || '');
+                const tagResult = fuzzyMatch(searchQuery, log.logEventType || '');
                 if (messageResult.match || eventResult.match || uuidResult.match || distinctIdResult.match || tagResult.match) {
                   const searchIndices = {
                     message: messageResult.match ? messageResult.indices : [],
@@ -1723,7 +1723,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 iconHtml +
                 '<span class="insight-heading">' + headingText + '</span>' +
                 '<span class="log-timestamp">' + escapeHtml(log.timestamp) + '</span>' +
-                '<span class="log-tag">' + escapeHtml(log.logTag) + '</span>' +
+                '<span class="log-event-type">' + escapeHtml(log.logEventType) + '</span>' +
                 '<span class="log-event">' + escapeHtml(log.event) + '</span>' +
               '</div>' +
               '<div class="log-body">' +
@@ -1748,7 +1748,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
               '<div class="log-checkbox ' + checkedClass + '"></div>' +
               '<span class="log-level ' + levelClass + '">' + escapeHtml(log.logLevel) + '</span>' +
               '<span class="log-timestamp">' + escapeHtml(log.timestamp) + '</span>' +
-              '<span class="log-tag">' + escapeHtml(log.logTag) + '</span>' +
+              '<span class="log-event-type">' + escapeHtml(log.logEventType) + '</span>' +
               '<span class="log-event">' + eventHtml + '</span>' +
             '</div>' +
             '<div class="log-body">' +
@@ -1847,7 +1847,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           document.getElementById('chat-context-label').textContent = contextLabel;
           var contextContainer = document.getElementById('chat-context-logs');
           contextContainer.innerHTML = chatLogs.map(function(l) {
-            return '<div class="chat-context-log">[' + escapeHtml(l.logLevel) + '] ' + escapeHtml(l.timestamp) + ' [' + escapeHtml(l.logTag) + '] ' + escapeHtml((l.logMessage || '').substring(0, 100)) + '</div>';
+            return '<div class="chat-context-log">[' + escapeHtml(l.logLevel) + '] ' + escapeHtml(l.timestamp) + ' [' + escapeHtml(l.logEventType) + '] ' + escapeHtml((l.logMessage || '').substring(0, 100)) + '</div>';
           }).join('');
 
           document.getElementById('chat-messages').innerHTML = '';
@@ -1893,7 +1893,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 
           var contextContainer = document.getElementById('chat-context-logs');
           contextContainer.innerHTML = chatLogs.map(function(l) {
-            return '<div class="chat-context-log">[' + escapeHtml(l.logLevel) + '] ' + escapeHtml(l.timestamp) + ' [' + escapeHtml(l.logTag) + '] ' + escapeHtml((l.logMessage || '').substring(0, 100)) + '</div>';
+            return '<div class="chat-context-log">[' + escapeHtml(l.logLevel) + '] ' + escapeHtml(l.timestamp) + ' [' + escapeHtml(l.logEventType) + '] ' + escapeHtml((l.logMessage || '').substring(0, 100)) + '</div>';
           }).join('');
 
           document.getElementById('chat-messages').innerHTML = '';

@@ -4,7 +4,7 @@ export interface LogEntry {
   timestamp: string;
   distinctId: string;
   logLevel: string;
-  logTag: string;
+  logEventType: string;
   logMessage: string;
   personId: string;
   properties: Record<string, unknown>;
