@@ -155,7 +155,14 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
 
   private _showOpenAISetupView(options?: OpenAISetupHtmlOptions) {
     if (!this._view) { return; }
-    this._view.webview.html = getOpenAISetupHtml(options);
+    const toUri = (file: string) =>
+      this._view!.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', file)).toString();
+    this._view.webview.html = getOpenAISetupHtml({
+      ...options,
+      openaiLogoUri: toUri('openai.svg'),
+      anthropicLogoUri: toUri('anthropic.svg'),
+      geminiLogoUri: toUri('gemini.svg'),
+    });
   }
 
   private _showLogsView() {

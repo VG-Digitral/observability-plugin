@@ -2425,6 +2425,13 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           margin-top: 4px;
           line-height: 1.4;
         }
+        .form-group .hint a {
+          color: var(--vscode-textLink-foreground);
+          text-decoration: none;
+        }
+        .form-group .hint a:hover {
+          color: var(--vscode-textLink-activeForeground);
+        }
         .form-group input {
           width: 100%;
           padding: 8px 10px;
@@ -2521,11 +2528,12 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         .platforms-section {
           margin-top: 36px;
           text-align: center;
-          background: var(--vscode-editor-inactiveSelectionBackground);
-          border: 1px solid var(--vscode-panel-border);
-          border-radius: 10px;
+          background: linear-gradient(145deg, rgba(99, 120, 255, 0.07) 0%, var(--vscode-editor-inactiveSelectionBackground) 70%);
+          border: 1px solid rgba(99, 120, 255, 0.35);
+          border-radius: 12px;
           padding: 22px 20px;
           position: relative;
+          box-shadow: 0 0 18px rgba(99, 120, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
         .platforms-icons-row {
           display: flex;
@@ -2545,6 +2553,9 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           width: 100%;
           height: 100%;
           object-fit: contain;
+        }
+        .platforms-icons-row .platform-icon:nth-child(-n+2) img {
+          filter: brightness(1.6) saturate(1.5);
         }
         .platforms-coming-soon {
           font-size: 13px;
@@ -2589,19 +2600,18 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         <div class="setup-header">
           <div class="setup-logo"><img src="${escapeHtml(logomarkSrc)}" alt="PostHog" /></div>
           <h1>Connect to PostHog</h1>
-          <p>Enter your PostHog credentials to start viewing live events in QAPilot.</p>
         </div>
 
         <div class="form-group">
           <label for="api-key">Personal API Key</label>
           <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" value="${escapeHtml(apiKey)}" />
-          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</div>
+          <div class="hint"><a href="https://app.posthog.com/settings/user-api-keys" target="_blank">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</a></div>
         </div>
 
         <div class="form-group">
           <label for="project-id">Project ID</label>
           <input type="text" id="project-id" placeholder="e.g. 12345" autocomplete="off" value="${escapeHtml(projectId)}" />
-          <div class="hint">Find this in PostHog &rarr; Settings &rarr; Project &rarr; Project ID</div>
+          <div class="hint"><a href="https://app.posthog.com/settings/project" target="_blank">Find this in PostHog &rarr; Settings &rarr; Project &rarr; Project ID</a></div>
         </div>
 
         <div class="setup-actions">
@@ -2610,12 +2620,6 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
 
         <div class="error-msg" id="error-msg"></div>
         <div class="success-msg" id="success-msg"></div>
-
-        <div class="help-link">
-          <a href="https://posthog.com/docs/api#personal-api-keys-recommended" target="_blank">
-            How to get your PostHog API key &rarr;
-          </a>
-        </div>
 
         <div class="platforms-section">
           <div class="platforms-icons-row" aria-hidden="true">
@@ -2697,11 +2701,17 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
 export interface OpenAISetupHtmlOptions {
   prefilledOpenAIKey?: string;
   showBackButton?: boolean;
+  openaiLogoUri?: string;
+  anthropicLogoUri?: string;
+  geminiLogoUri?: string;
 }
 
 export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
   const openaiKey = options?.prefilledOpenAIKey ?? '';
   const showBack = options?.showBackButton ?? false;
+  const openaiLogoSrc = options?.openaiLogoUri ?? '';
+  const anthropicLogoSrc = options?.anthropicLogoUri ?? '';
+  const geminiLogoSrc = options?.geminiLogoUri ?? '';
   return `<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -2783,6 +2793,13 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
           margin-top: 4px;
           line-height: 1.4;
         }
+        .form-group .hint a {
+          color: var(--vscode-textLink-foreground);
+          text-decoration: none;
+        }
+        .form-group .hint a:hover {
+          color: var(--vscode-textLink-activeForeground);
+        }
         .form-group input {
           width: 100%;
           padding: 8px 10px;
@@ -2863,18 +2880,45 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
           display: none;
           line-height: 1.4;
         }
-        .help-link {
-          display: block;
+        .ai-models-section {
+          margin-top: 36px;
           text-align: center;
-          margin-top: 20px;
+          background: linear-gradient(145deg, rgba(99, 120, 255, 0.07) 0%, var(--vscode-editor-inactiveSelectionBackground) 70%);
+          border: 1px solid rgba(99, 120, 255, 0.35);
+          border-radius: 12px;
+          padding: 22px 20px;
+          position: relative;
+          box-shadow: 0 0 18px rgba(99, 120, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+        .ai-models-icons-row {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 12px;
+        }
+        .ai-models-icons-row .model-icon {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .ai-models-icons-row .model-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          filter: invert(1) brightness(0.85);
+        }
+        .ai-models-coming-soon {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--vscode-foreground);
+          margin-bottom: 6px;
+        }
+        .ai-models-sub {
           font-size: 11px;
-        }
-        .help-link a {
-          color: var(--vscode-textLink-foreground);
-          text-decoration: none;
-        }
-        .help-link a:hover {
-          text-decoration: underline;
+          color: var(--vscode-descriptionForeground);
         }
       </style>
     </head>
@@ -2888,15 +2932,15 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
         </div>
 
         <div class="setup-header">
-          <div class="setup-logo">&#129302;</div>
+          <div class="setup-logo"><img src="${escapeHtml(openaiLogoSrc)}" alt="OpenAI" style="filter: invert(1) brightness(0.9);" /></div>
           <h1>Connect OpenAI</h1>
-          <p>QAPilot uses OpenAI to analyze your logs and generate insights. Enter your API key to enable AI features.</p>
+          <p>QAPilot uses OpenAI to analyze your logs and generate insights.</p>
         </div>
 
         <div class="form-group">
           <label for="openai-key">OpenAI API Key</label>
           <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off" value="${escapeHtml(openaiKey)}" />
-          <div class="hint">Find this at <strong>platform.openai.com</strong> &rarr; API Keys</div>
+          <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">Find this at platform.openai.com &rarr; API Keys</a></div>
         </div>
 
         <div class="setup-actions">
@@ -2906,10 +2950,13 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
         <div class="error-msg" id="error-msg"></div>
         <div class="success-msg" id="success-msg"></div>
 
-        <div class="help-link">
-          <a href="https://platform.openai.com/api-keys" target="_blank">
-            Get your OpenAI API key &rarr;
-          </a>
+        <div class="ai-models-section">
+          <div class="ai-models-icons-row" aria-hidden="true">
+            <span class="model-icon" title="Anthropic"><img src="${escapeHtml(anthropicLogoSrc)}" alt="Anthropic" /></span>
+            <span class="model-icon" title="Gemini"><img src="${escapeHtml(geminiLogoSrc)}" alt="Gemini" /></span>
+          </div>
+          <p class="ai-models-coming-soon">More AI models coming soon</p>
+          <p class="ai-models-sub">Anthropic, Gemini and others are on the way!</p>
         </div>
       </div>
 
