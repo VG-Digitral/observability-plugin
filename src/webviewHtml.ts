@@ -3007,7 +3007,7 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
           }
 
           btn.disabled = true;
-          btn.textContent = 'Saving...';
+          btn.textContent = 'Validating...';
 
           vscode.postMessage({
             type: 'saveOpenAIKey',
@@ -3027,7 +3027,7 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
 
           if (msg.type === 'openaiKeyResult') {
             if (msg.success) {
-              successEl.textContent = 'API key saved! Starting QAPilot...';
+              successEl.textContent = 'Connected successfully! Starting QAPilot...';
               successEl.style.display = 'block';
               errorEl.style.display = 'none';
             } else {

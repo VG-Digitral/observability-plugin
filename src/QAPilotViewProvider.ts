@@ -246,13 +246,41 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async _validateOpenAIKey(openaiKey: string): Promise<void> {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5,
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let detail = '';
+      try {
+        const json = JSON.parse(text);
+        detail = json?.error?.message ?? text;
+      } catch {
+        detail = text;
+      }
+      throw new Error(detail || `HTTP ${response.status}`);
+    }
+  }
+
   private async _handleSaveOpenAIKey(openaiKey: string) {
     try {
+      await this._validateOpenAIKey(openaiKey);
+
       await this._credentialManager.storeOpenAIKey(openaiKey);
       this._openaiKey = openaiKey;
 
       this._view?.webview.postMessage({ type: 'openaiKeyResult', success: true });
-      log('OpenAI API key saved successfully');
+      log('OpenAI API key validated and saved successfully');
 
       await new Promise(resolve => setTimeout(resolve, 800));
       await this._runSchemaMappingFlow();
@@ -260,11 +288,11 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       this.startPolling();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      log(`Failed to save OpenAI key: ${msg}`);
+      log(`Failed to validate/save OpenAI key: ${msg}`);
       this._view?.webview.postMessage({
         type: 'openaiKeyResult',
         success: false,
-        error: `Failed to save key: ${msg}`
+        error: `Invalid API key: ${msg}`
       });
     }
   }
