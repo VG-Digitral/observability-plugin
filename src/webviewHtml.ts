@@ -128,7 +128,8 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           left: 8px;
           top: 50%;
           transform: translateY(-50%);
-          font-size: 12px;
+          display: flex;
+          align-items: center;
           opacity: 0.6;
           pointer-events: none;
         }
@@ -1056,7 +1057,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 
       <div class="filter-bar hidden" id="filter-bar">
         <div class="search-container">
-          <span class="search-icon">&#128269;</span>
+          <span class="search-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><line x1="9.9" y1="9.9" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
           <input type="text" class="search-input" id="search-input" placeholder="Search all logs..." oninput="handleFilter()">
         </div>
         <label class="filter-label">Level:</label>
@@ -1074,7 +1075,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 
       <div class="logs-container" id="logs-container">
         <div class="empty-state">
-          <p style="font-size: 24px; margin-bottom: 12px;">&#128225;</p>
+          <p style="margin-bottom: 12px; opacity: 0.5;"><svg width="32" height="32" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="12" r="1.5" fill="currentColor"/><path d="M5.2 9.5a3.96 3.96 0 015.6 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 6.8a7.5 7.5 0 0111 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M0 4a11.2 11.2 0 0116 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></p>
           <p><strong>Watching for live logs...</strong></p>
         </div>
       </div>
@@ -1092,11 +1093,11 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         <span class="selection-count" id="selection-count">0 selected</span>
         <div class="toolbar-divider"></div>
         <button class="btn-chat-logs" onclick="openNativeChat()">
-          <span>&#128172;</span>
+          <span><svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px"><path d="M2 3C2 2.45 2.45 2 3 2H13C13.55 2 14 2.45 14 3V10C14 10.55 13.55 11 13 11H5L2 14V3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
           Chat with Logs
         </button>
         <button class="btn-send-agent" onclick="sendToAgent()">
-          <span>&#10024;</span>
+          <span><svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px"><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.7 3.7l2.1 2.1M10.2 10.2l2.1 2.1M12.3 3.7l-2.1 2.1M5.8 10.2l-2.1 2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
           Send to Cursor Agent
         </button>
         <button class="btn-clear-selection" onclick="clearSelection()">Clear</button>
@@ -1115,7 +1116,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           <div class="chat-tab-actions">
             <button class="chat-tab-btn" onclick="startNewChat()" title="New chat">&#43;</button>
             <div class="chat-history-wrapper">
-              <button class="chat-tab-btn" onclick="toggleChatHistoryDropdown()" title="Chat history">&#128340;</button>
+              <button class="chat-tab-btn" onclick="toggleChatHistoryDropdown()" title="Chat history"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><polyline points="8,4.5 8,8 10.5,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               <div class="chat-history-dropdown" id="chat-history-dropdown"></div>
             </div>
             <button class="chat-tab-btn" onclick="closeNativeChat()" title="Close">&#10005;</button>
@@ -1123,7 +1124,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         </div>
         <div class="chat-context" id="chat-context">
           <div class="chat-context-title">
-            <span>&#128203;</span> Analyzing <span id="chat-log-count">0</span> <span id="chat-context-label">selected</span> log(s)
+            <span><svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px"><rect x="3" y="1.5" width="10" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5"/><line x1="5.5" y1="6" x2="10.5" y2="6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="5.5" y1="11" x2="8.5" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span> Analyzing <span id="chat-log-count">0</span> <span id="chat-context-label">selected</span> log(s)
           </div>
           <div class="chat-context-logs" id="chat-context-logs"></div>
         </div>
@@ -1505,7 +1506,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             currentFiltered = [];
             container.innerHTML =
               '<div class="empty-state">' +
-              '<p style="font-size: 24px; margin-bottom: 12px;">&#128225;</p>' +
+              '<p style="margin-bottom: 12px; opacity: 0.5;"><svg width="32" height="32" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="12" r="1.5" fill="currentColor"/><path d="M5.2 9.5a3.96 3.96 0 015.6 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 6.8a7.5 7.5 0 0111 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M0 4a11.2 11.2 0 0116 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></p>' +
               '<p><strong>Watching for live logs...</strong></p>' +
               '</div>';
             resultCount.textContent = '';
@@ -1713,7 +1714,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
                 '<div class="insight-level2" id="' + insightId + '">' +
                   renderMarkdown(log.level2Markdown) +
                   '<div class="go-deeper-container">' +
-                    '<button class="go-deeper-btn" onclick="event.stopPropagation(); goDeeper(' + index + ')" title="Analyze source logs in depth">&#128269; Go Deeper</button>' +
+                    '<button class="go-deeper-btn" onclick="event.stopPropagation(); goDeeper(' + index + ')" title="Analyze source logs in depth"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px;margin-right:4px"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><line x1="9.9" y1="9.9" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Go Deeper</button>' +
                   '</div>' +
                 '</div>';
             }
@@ -2261,9 +2262,11 @@ export function getIntroHtml(options?: { posthogLogoUri?: string }): string {
           color: var(--vscode-foreground);
         }
         .feature-icon {
-          font-size: 16px;
+          display: inline-flex;
+          align-items: center;
           flex-shrink: 0;
           margin-top: 1px;
+          opacity: 0.8;
         }
         .feature-item strong {
           font-weight: 600;
@@ -2299,15 +2302,15 @@ export function getIntroHtml(options?: { posthogLogoUri?: string }): string {
 
         <div class="feature-list">
           <div class="feature-item">
-            <span class="feature-icon">&#128225;</span>
+            <span class="feature-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="12" r="1.5" fill="currentColor"/><path d="M5.2 9.5a3.96 3.96 0 015.6 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 6.8a7.5 7.5 0 0111 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M0 4a11.2 11.2 0 0116 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
             <span><strong>Live log streaming</strong> &mdash; Watch events in real time without leaving the IDE.</span>
           </div>
           <div class="feature-item">
-            <span class="feature-icon">&#9889;</span>
+            <span class="feature-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 1.5L5 8.5H8.5L7 14.5L12 7.5H8.5L9.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
             <span><strong>AI-driven insights</strong> &mdash; Automatically surfaces error spikes, performance regressions, and anomalies.</span>
           </div>
           <div class="feature-item">
-            <span class="feature-icon">&#128172;</span>
+            <span class="feature-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 3C2 2.45 2.45 2 3 2H13C13.55 2 14 2.45 14 3V10C14 10.55 13.55 11 13 11H5L2 14V3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
             <span><strong>Chat with your logs</strong> &mdash; Ask questions about your logs and get detailed answers.</span>
           </div>
         </div>
@@ -2357,10 +2360,10 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           color: var(--vscode-foreground);
           background: var(--vscode-panel-background);
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
           min-height: 100vh;
-          padding: 24px;
+          padding: 16px 24px;
         }
         .setup-container {
           max-width: 420px;
@@ -2368,11 +2371,11 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         }
         .setup-header {
           text-align: center;
-          margin-bottom: 28px;
+          margin-bottom: 16px;
         }
         .setup-logo {
           font-size: 32px;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
         .setup-logo img {
           width: 40px;
@@ -2394,7 +2397,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           display: flex;
           justify-content: center;
           gap: 8px;
-          margin-bottom: 24px;
+          margin-bottom: 14px;
         }
         .step-dot {
           width: 8px;
@@ -2410,7 +2413,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           background: #3fb950;
         }
         .form-group {
-          margin-bottom: 16px;
+          margin-bottom: 12px;
         }
         .form-group label {
           display: block;
@@ -2474,7 +2477,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         }
         .setup-actions .connect-btn { width: 100%; }
         .setup-top-bar {
-          margin-bottom: 20px;
+          margin-bottom: 12px;
           text-align: left;
         }
         .back-btn {
@@ -2526,12 +2529,12 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           text-decoration: underline;
         }
         .platforms-section {
-          margin-top: 36px;
+          margin-top: 20px;
           text-align: center;
           background: linear-gradient(145deg, rgba(99, 120, 255, 0.07) 0%, var(--vscode-editor-inactiveSelectionBackground) 70%);
           border: 1px solid rgba(99, 120, 255, 0.35);
           border-radius: 12px;
-          padding: 22px 20px;
+          padding: 16px 20px;
           position: relative;
           box-shadow: 0 0 18px rgba(99, 120, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
@@ -2540,7 +2543,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           justify-content: center;
           align-items: center;
           gap: 20px;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
         .platforms-icons-row .platform-icon {
           width: 28px;
@@ -2561,12 +2564,12 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           font-size: 13px;
           font-weight: 500;
           color: var(--vscode-foreground);
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
         .platforms-sub {
           font-size: 11px;
           color: var(--vscode-descriptionForeground);
-          margin-bottom: 16px;
+          margin-bottom: 12px;
         }
         .platform-request-btn {
           display: inline-block;
