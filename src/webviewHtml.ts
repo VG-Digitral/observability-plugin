@@ -1607,6 +1607,19 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           }
         }
 
+        function deepParseJson(val) {
+          if (typeof val === 'string') {
+            try { return deepParseJson(JSON.parse(val)); } catch(e) { return val; }
+          }
+          if (Array.isArray(val)) return val.map(deepParseJson);
+          if (val && typeof val === 'object') {
+            var out = {};
+            Object.keys(val).forEach(function(k) { out[k] = deepParseJson(val[k]); });
+            return out;
+          }
+          return val;
+        }
+
         function toggleRawJson(index) {
           var log = displayedLogs[index];
           if (!log || log.rawPosthogEvent == null) return;
@@ -1621,7 +1634,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             if (label) label.textContent = '\\u25BC Raw JSON';
           } else {
             try {
-              var jsonStr = JSON.stringify(log.rawPosthogEvent, null, 2);
+              var jsonStr = JSON.stringify(deepParseJson(log.rawPosthogEvent), null, 2);
               panel.innerHTML = '<pre class="raw-json-pre">' + escapeHtml(jsonStr) + '</pre>';
               panel.classList.add('expanded');
               panel.setAttribute('aria-hidden', 'false');
