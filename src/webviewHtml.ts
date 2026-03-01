@@ -62,14 +62,17 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           cursor: pointer;
           border-radius: 3px;
           font-family: var(--vscode-font-family);
+          transition: background 0.15s, transform 0.1s, opacity 0.1s;
         }
         .btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+        .btn:active { transform: scale(0.95); opacity: 0.85; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary {
           background: var(--vscode-button-background);
           color: var(--vscode-button-foreground);
         }
         .btn-primary:hover { background: var(--vscode-button-hoverBackground); }
+        .btn-primary:active { transform: scale(0.95); }
 
         /* Error Banner */
         .error-banner {
@@ -94,6 +97,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           font-family: var(--vscode-font-family);
         }
         .error-banner button:hover { background: var(--vscode-button-hoverBackground); }
+        .error-banner button:active { transform: scale(0.95); }
 
         /* Filter Bar */
         .filter-bar {
@@ -179,6 +183,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           opacity: 1;
           background: var(--vscode-list-hoverBackground);
         }
+        .window-indicator:active { background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground)); opacity: 0.85; }
         .window-indicator .indicator-arrow {
           display: inline-block;
           animation: bounce 1.5s ease infinite;
@@ -255,6 +260,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           background: var(--vscode-button-hoverBackground);
           transform: scale(1.1);
         }
+        .scroll-to-bottom:active { transform: scale(0.97); }
         .scroll-to-bottom svg { width: 18px; height: 18px; }
 
         /* Log Card */
@@ -472,11 +478,13 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           cursor: pointer;
           border-radius: 4px;
           font-family: var(--vscode-font-family);
+          transition: background 0.15s, color 0.15s, transform 0.1s, opacity 0.1s;
         }
         .btn-clear-selection:hover {
           background: var(--vscode-button-secondaryHoverBackground);
           color: var(--vscode-foreground);
         }
+        .btn-clear-selection:active { transform: scale(0.95); opacity: 0.8; }
 
         /* Insight Cards */
         .log-card.insight-card {
@@ -680,12 +688,13 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           cursor: pointer;
           padding: 8px 10px;
           line-height: 1;
-          transition: background 0.15s, color 0.15s;
+          transition: background 0.15s, color 0.15s, transform 0.1s;
         }
         .chat-tab-btn:hover {
           background: var(--vscode-toolbar-hoverBackground);
           color: var(--vscode-foreground);
         }
+        .chat-tab-btn:active { background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); transform: scale(0.88); }
         .chat-history-wrapper {
           position: relative;
         }
@@ -927,9 +936,10 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           cursor: pointer;
           font-family: var(--vscode-font-family);
           white-space: nowrap;
-          transition: background 0.15s;
+          transition: background 0.15s, transform 0.1s;
         }
         .chat-send-btn:hover { background: var(--vscode-button-hoverBackground); }
+        .chat-send-btn:active { transform: scale(0.96); }
         .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Floating chat button */
@@ -1002,6 +1012,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
           justify-content: center;
         }
         .btn-settings:hover { background: var(--vscode-button-secondaryHoverBackground); }
+        .btn-settings:active { transform: scale(0.96); opacity: 0.85; }
         .settings-dropdown {
           position: absolute;
           top: 100%;
@@ -1033,6 +1044,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         .settings-dropdown button:hover {
           background: var(--vscode-list-hoverBackground);
         }
+        .settings-dropdown button:active { background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground)); opacity: 0.85; }
       </style>
     </head>
     <body>
@@ -2464,10 +2476,12 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           border-radius: 4px;
           cursor: pointer;
           margin-top: 8px;
+          transition: background 0.15s, transform 0.1s;
         }
         .connect-btn:hover {
           background: var(--vscode-button-hoverBackground);
         }
+        .connect-btn:active { transform: scale(0.98); }
         .connect-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -2493,6 +2507,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         .back-btn:hover {
           text-decoration: underline;
         }
+        .back-btn:active { opacity: 0.6; }
         .error-msg {
           background: rgba(248, 81, 73, 0.15);
           border: 1px solid rgba(248, 81, 73, 0.4);
@@ -2582,13 +2597,14 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
           border-radius: 6px;
           cursor: pointer;
           text-decoration: none;
-          transition: opacity 0.2s;
+          transition: opacity 0.2s, transform 0.1s;
         }
         .platform-request-btn:hover {
           opacity: 0.9;
           color: var(--vscode-button-foreground);
           text-decoration: none;
         }
+        .platform-request-btn:active { opacity: 0.75; transform: scale(0.97); }
       </style>
     </head>
     <body>
@@ -2832,10 +2848,12 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
           border-radius: 4px;
           cursor: pointer;
           margin-top: 8px;
+          transition: background 0.15s, transform 0.1s;
         }
         .connect-btn:hover {
           background: var(--vscode-button-hoverBackground);
         }
+        .connect-btn:active { transform: scale(0.98); }
         .connect-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -2861,6 +2879,7 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
         .back-btn:hover {
           text-decoration: underline;
         }
+        .back-btn:active { opacity: 0.6; }
         .error-msg {
           background: rgba(248, 81, 73, 0.15);
           border: 1px solid rgba(248, 81, 73, 0.4);
