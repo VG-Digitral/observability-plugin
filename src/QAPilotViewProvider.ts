@@ -286,13 +286,13 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
       await this._runSchemaMappingFlow();
       this._showLogsView();
       this.startPolling();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log(`Failed to validate/save OpenAI key: ${msg}`);
+    } catch {
+      // Don't log or send raw API error messages to avoid any key fragments (e.g. masked sk-proj-...)
+      log('Failed to validate/save OpenAI key: Invalid or incorrect API key.');
       this._view?.webview.postMessage({
         type: 'openaiKeyResult',
         success: false,
-        error: `Invalid API key: ${msg}`
+        error: 'Invalid or incorrect API key. Check your key at https://platform.openai.com/api-keys'
       });
     }
   }
