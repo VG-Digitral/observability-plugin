@@ -30,9 +30,15 @@ export async function discoverSchema(credentials: PostHogCredentials): Promise<S
   const query = `SELECT properties FROM events ORDER BY created_at DESC LIMIT 20`;
   try {
     const response = await callApi('hogql_query', { query }, credentials);
-    const results = (response?.data?.results as unknown[][] | undefined) ?? [];
+    const data = response?.data;
+    const dataKeys = data && typeof data === 'object' ? Object.keys(data) : [];
+    log(`[discoverSchema] API response.data keys: ${dataKeys.length ? dataKeys.join(', ') : 'none'}`);
+    const results = (data?.results as unknown[][] | undefined) ?? [];
+    const resultsIsArray = Array.isArray(results);
+    log(`[discoverSchema] data.results: isArray=${resultsIsArray} length=${resultsIsArray ? results.length : 'n/a'}`);
     if (results.length === 0) {
-      log('Schema discovery: no events returned');
+      const dataSnippet = data ? JSON.stringify(data).substring(0, 400) : 'null';
+      log(`[discoverSchema] No events from PostHog query. data snippet: ${dataSnippet}${data && JSON.stringify(data).length > 400 ? '...' : ''}`);
       return null;
     }
 
@@ -71,10 +77,10 @@ export async function discoverSchema(credentials: PostHogCredentials): Promise<S
       samples[k] = samplesByKey[k] ?? [];
     }
 
-    log(`Schema discovery: ${keys.length} unique property keys from ${results.length} events`);
+    log(`[discoverSchema] Done: ${keys.length} unique property keys from ${results.length} events`);
     return { keys, samples };
   } catch (err) {
-    log(`Schema discovery failed: ${err instanceof Error ? err.message : String(err)}`);
+    log(`[discoverSchema] Failed: ${err instanceof Error ? err.message : String(err)}`);
     throw err;
   }
 }
@@ -102,9 +108,11 @@ export async function generateFieldMapping(
   openaiKey: string
 ): Promise<FieldMapping | null> {
   if (!schemaInfo || schemaInfo.keys.length === 0) {
+    log(`[generateFieldMapping] Skipping: schemaInfo=${!!schemaInfo} keysLength=${schemaInfo?.keys.length ?? 0}`);
     return null;
   }
 
+  log(`[generateFieldMapping] Requesting mapping for ${schemaInfo.keys.length} keys from OpenAI (model: gpt-4.1)`);
   const keysWithSamples = schemaInfo.keys
     .map((k) => {
       const samples = schemaInfo.samples[k];
@@ -145,22 +153,22 @@ Return the mapping JSON only.`;
 
     if (!response.ok) {
       const text = await response.text();
-      log(`OpenAI mapping failed: ${response.status} ${text.substring(0, 200)}`);
+      log(`[generateFieldMapping] OpenAI API error: status=${response.status} body=${text.substring(0, 300)}`);
       return null;
     }
 
     const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     const content = data?.choices?.[0]?.message?.content;
     if (!content || typeof content !== 'string') {
-      log('OpenAI mapping: no content in response');
+      log(`[generateFieldMapping] No content in response: choices length=${data?.choices?.length ?? 0}`);
       return null;
     }
 
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(content) as Record<string, unknown>;
-    } catch {
-      log('OpenAI mapping: malformed JSON in response');
+    } catch (parseErr) {
+      log(`[generateFieldMapping] Malformed JSON in response. Content snippet: ${content.substring(0, 150)}...`);
       return null;
     }
 
@@ -171,10 +179,10 @@ Return the mapping JSON only.`;
       personId: typeof parsed.personId === 'string' ? parsed.personId : null,
     };
 
-    log(`Field mapping generated: logLevel=${mapping.logLevel ?? 'null'} logEventType=${mapping.logEventType ?? 'null'} logMessage=${mapping.logMessage ?? 'null'} personId=${mapping.personId ?? 'null'}`);
+    log(`[generateFieldMapping] Parsed mapping: logLevel=${mapping.logLevel ?? 'null'} logEventType=${mapping.logEventType ?? 'null'} logMessage=${mapping.logMessage ?? 'null'} personId=${mapping.personId ?? 'null'}`);
     return mapping;
   } catch (err) {
-    log(`OpenAI mapping error: ${err instanceof Error ? err.message : String(err)}`);
+    log(`[generateFieldMapping] Error: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }

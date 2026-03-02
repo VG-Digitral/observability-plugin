@@ -2624,7 +2624,7 @@ export function getSetupHtml(options?: SetupHtmlOptions): string {
         <div class="form-group">
           <label for="api-key">Personal API Key</label>
           <input type="password" id="api-key" placeholder="phx_..." autocomplete="off" value="${escapeHtml(apiKey)}" />
-          <div class="hint"><a href="https://app.posthog.com/settings/user-api-keys" target="_blank">Find this in PostHog &rarr; Settings &rarr; Personal API Keys</a></div>
+          <div class="hint"><a href="https://app.posthog.com/settings/user-api-keys" target="_blank">Find this in PostHog &rarr; Settings &rarr; Personal API Keys.<br>Select preset "Performing analytics queries"</a></div>
         </div>
 
         <div class="form-group">

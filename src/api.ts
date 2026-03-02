@@ -26,9 +26,16 @@ export async function callApi(action: string, params: Record<string, unknown>, c
       throw new Error(`API returned ${response.status}: ${text.substring(0, 200)}`);
     }
 
-    const parsed = JSON.parse(text) as { data: Record<string, unknown> };
-    console.log('API response', parsed);
-    return parsed;
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    // Lambda function URL returns { statusCode, body, headers, ... }; actual payload is in body (JSON string)
+    if ('body' in parsed && typeof parsed.body === 'string') {
+      const body = JSON.parse(parsed.body) as Record<string, unknown>;
+      // Proxy/Lambda may return { success, data: { results, ... } }; we need response.data.results for callers
+      const data = body && typeof body.data === 'object' && body.data !== null ? (body.data as Record<string, unknown>) : body;
+      return { data };
+    }
+    // Already in expected shape { data: ... } (e.g. API Gateway that unwraps for us)
+    return parsed as { data: Record<string, unknown> };
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof Error && err.name === 'AbortError') {

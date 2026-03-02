@@ -181,33 +181,43 @@ export class QApilotViewProvider implements vscode.WebviewViewProvider {
 
   /** Fetches sample events, asks LLM for field mapping, stores it. Uses null mapping on any failure. */
   private async _runSchemaMappingFlow(): Promise<void> {
+    log('[Schema mapping] Flow started');
     if (!this._credentials || !this._openaiKey) {
+      log(`[Schema mapping] Early exit: credentials=${!!this._credentials} openaiKey=${!!this._openaiKey}`);
       this._fieldMapping = null;
       return;
     }
+    log(`[Schema mapping] ProjectId=${this._credentials.projectId}, discovering schema...`);
     this._showAnalyzingSchemaView();
     try {
       let schemaInfo: Awaited<ReturnType<typeof discoverSchema>> = null;
       try {
         schemaInfo = await discoverSchema(this._credentials);
+        if (schemaInfo) {
+          log(`[Schema mapping] Schema discovered: ${schemaInfo.keys.length} property keys (${schemaInfo.keys.slice(0, 10).join(', ')}${schemaInfo.keys.length > 10 ? '...' : ''})`);
+        } else {
+          log('[Schema mapping] Schema discovery returned null (no events or empty result)');
+        }
       } catch (err) {
-        log(`Schema discovery failed, using fallback mapping: ${err instanceof Error ? err.message : String(err)}`);
+        log(`[Schema mapping] Schema discovery failed, using fallback mapping: ${err instanceof Error ? err.message : String(err)}`);
         this._fieldMapping = null;
         return;
       }
+      log('[Schema mapping] Calling generateFieldMapping (OpenAI)...');
       const mapping = await generateFieldMapping(schemaInfo, this._openaiKey);
       if (mapping) {
         await this._credentialManager.storeFieldMapping(this._credentials.projectId, mapping);
         this._fieldMapping = mapping;
+        log(`[Schema mapping] Success: mapping stored (logMessage=${mapping.logMessage ?? 'null'}, logLevel=${mapping.logLevel ?? 'null'})`);
       } else {
         this._fieldMapping = null;
-        log('Field mapping not generated (empty schema or OpenAI failure), using fallback');
+        log('[Schema mapping] Field mapping not generated (empty schema or OpenAI failure), using fallback');
         void vscode.window.showWarningMessage(
           'QApilot could not generate a custom field mapping. Using default property names (log_message, level, etc.). If your events use different property keys, logs may not display correctly.'
         );
       }
     } catch (err) {
-      log(`Schema mapping flow error: ${err instanceof Error ? err.message : String(err)}`);
+      log(`[Schema mapping] Flow error: ${err instanceof Error ? err.message : String(err)}`);
       this._fieldMapping = null;
     }
   }
@@ -634,13 +644,15 @@ export class QApilotViewProvider implements vscode.WebviewViewProvider {
     const response = await callApi('hogql_query', { query }, this._credentials);
 
     if (!response || !response.data) {
-      log('API returned no data');
+      const respKeys = response && typeof response === 'object' ? Object.keys(response) : [];
+      const dataKeys = response?.data && typeof response.data === 'object' ? Object.keys(response.data) : [];
+      log(`API returned no data. response keys: ${respKeys.join(', ') || 'none'}, response.data keys: ${dataKeys.join(', ') || 'none'}`);
       return;
     }
 
     const results: unknown[][] = (response.data.results as unknown[][]) || [];
     if (results.length === 0) {
-      log(`No events after ${this._lastCreatedAt}`);
+      log(`No events after ${this._lastCreatedAt} (results array empty). response.data keys: ${Object.keys(response.data).join(', ')}`);
       return;
     }
 

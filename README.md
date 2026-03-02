@@ -28,6 +28,6 @@ API keys are stored securely via VS Code's built-in secret storage. No configura
 
 ## Release Notes
 
-### 0.0.1
+### 0.0.4
 
 Initial release with bug fixes — real-time PostHog log viewer connected to an intelligence layer for log insights
