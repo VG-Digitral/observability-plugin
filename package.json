@@ -1,8 +1,8 @@
 {
   "name": "qapilot",
-  "displayName": "QAPilot",
+  "displayName": "QApilot",
   "description": "Real-time PostHog log viewer for VS Code",
-  "version": "0.0.5",
+  "version": "0.0.1",
   "publisher": "VidusheeGeetam",
   "engines": {
     "vscode": "^1.85.0"
@@ -17,44 +17,44 @@
     "commands": [
       {
         "command": "qapilot.fetchLogs",
-        "title": "Show QAPilot Logs",
-        "category": "QAPilot"
+        "title": "Show QApilot Logs",
+        "category": "QApilot"
       },
       {
         "command": "qapilot.resetToWelcome",
         "title": "Reset to Welcome Screen",
-        "category": "QAPilot"
+        "category": "QApilot"
       },
       {
         "command": "qapilot.refreshLogs",
         "title": "Refresh Logs",
         "icon": "$(refresh)",
-        "category": "QAPilot"
+        "category": "QApilot"
       },
       {
         "command": "qapilot.clearLogs",
         "title": "Clear Logs",
         "icon": "$(clear-all)",
-        "category": "QAPilot"
+        "category": "QApilot"
       },
       {
         "command": "qapilot.startPolling",
         "title": "Start Polling",
         "icon": "$(play)",
-        "category": "QAPilot"
+        "category": "QApilot"
       },
       {
         "command": "qapilot.stopPolling",
         "title": "Stop Polling",
         "icon": "$(debug-stop)",
-        "category": "QAPilot"
+        "category": "QApilot"
       }
     ],
     "viewsContainers": {
       "panel": [
         {
           "id": "qapilot-panel",
-          "title": "QAPilot",
+          "title": "QApilot",
           "icon": "$(output)"
         }
       ]

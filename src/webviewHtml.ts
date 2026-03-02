@@ -1049,7 +1049,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     </head>
     <body>
       <div class="header">
-        <h2>QAPilot</h2>
+        <h2>QApilot</h2>
         <span class="spacer"></span>
         <button class="btn" id="clear-btn" onclick="clearLogs()">Clear</button>
         <div class="settings-wrap" id="settings-wrap">
@@ -2309,7 +2309,7 @@ export function getIntroHtml(options?: { posthogLogoUri?: string }): string {
     <body>
       <div class="intro-container">
         <div class="intro-logo"><img src="${escapeHtml(logoSrc)}" alt="PostHog" /></div>
-        <h1>Welcome to QAPilot</h1>
+        <h1>Welcome to QApilot</h1>
         <p class="intro-tagline">AI-powered observability right inside your editor. Connect your logs, get real-time insights, and debug faster.</p>
 
         <div class="feature-list">
@@ -2956,7 +2956,7 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
         <div class="setup-header">
           <div class="setup-logo"><img src="${escapeHtml(openaiLogoSrc)}" alt="OpenAI" style="filter: invert(1) brightness(0.9);" /></div>
           <h1>Connect OpenAI</h1>
-          <p>QAPilot uses OpenAI to analyze your logs and generate insights.</p>
+          <p>QApilot uses OpenAI to analyze your logs and generate insights.</p>
         </div>
 
         <div class="form-group">
@@ -3027,7 +3027,7 @@ export function getOpenAISetupHtml(options?: OpenAISetupHtmlOptions): string {
 
           if (msg.type === 'openaiKeyResult') {
             if (msg.success) {
-              successEl.textContent = 'Connected successfully! Starting QAPilot...';
+              successEl.textContent = 'Connected successfully! Starting QApilot...';
               successEl.style.display = 'block';
               errorEl.style.display = 'none';
             } else {

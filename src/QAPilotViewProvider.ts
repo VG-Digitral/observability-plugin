@@ -12,7 +12,7 @@ import type * as ConversationStore from './conversationStore.js';
 import { CredentialManager, type PostHogCredentials, type FieldMapping } from './credentialManager.js';
 import { discoverSchema, generateFieldMapping } from './schemaMapper.js';
 
-export class QAPilotViewProvider implements vscode.WebviewViewProvider {
+export class QApilotViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'qapilot.logsView';
   private _view?: vscode.WebviewView;
   private _logs: LogEntry[] = [];
@@ -203,7 +203,7 @@ export class QAPilotViewProvider implements vscode.WebviewViewProvider {
         this._fieldMapping = null;
         log('Field mapping not generated (empty schema or OpenAI failure), using fallback');
         void vscode.window.showWarningMessage(
-          'QAPilot could not generate a custom field mapping. Using default property names (log_message, level, etc.). If your events use different property keys, logs may not display correctly.'
+          'QApilot could not generate a custom field mapping. Using default property names (log_message, level, etc.). If your events use different property keys, logs may not display correctly.'
         );
       }
     } catch (err) {
