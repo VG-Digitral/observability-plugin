@@ -2,7 +2,7 @@
   "name": "qapilot",
   "displayName": "QAPilot",
   "description": "Real-time PostHog log viewer for VS Code",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "VidusheeGeetam",
   "engines": {
     "vscode": "^1.85.0"
